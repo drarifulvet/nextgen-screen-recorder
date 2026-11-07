@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>NextGen Screen Recorder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: two-column studio (preview stage left, setup cards right) with Record/Library tabs; one column on phones. Mirrors the Windows app v0.2. */
+:root {
+  --bg: #F1F6F5;
+  --panel: #FFFFFF;
+  --panel-2: #E6EFEE;
+  --line: #D2E0DE;
+  --text: #12313A;
+  --muted: #557277;
+  --accent: #C3F44D;
+  --accent-ink: #12313A;
+  --accent-strong: #1A434E;
+  --green: #2E9E5B;
+  --red: #E5484D;
+  --demo: #6E56CF;
+  --demo-bg: #EFEBFF;
+  --well: #DCE7E5;
+  --shadow: 0 6px 24px rgba(18, 49, 58, .12);
+  --font-ui: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F2A31; --panel: #1A434E; --panel-2: #21525F; --line: #2C6372; --text: #EAF4F1; --muted: #A8C3C2;
+    --accent: #C3F44D; --accent-ink: #12313A; --accent-strong: #C3F44D; --green: #61D384; --red: #FF5A5F;
+    --demo: #D2C2F8; --demo-bg: #2E2A4A; --well: #0A1E23; --shadow: 0 6px 24px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F2A31; --panel: #1A434E; --panel-2: #21525F; --line: #2C6372; --text: #EAF4F1; --muted: #A8C3C2;
+  --accent: #C3F44D; --accent-ink: #12313A; --accent-strong: #C3F44D; --green: #61D384; --red: #FF5A5F;
+  --demo: #D2C2F8; --demo-bg: #2E2A4A; --well: #0A1E23; --shadow: 0 6px 24px rgba(0, 0, 0, .35);
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 var(--font-ui);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 24px;
+}
+button, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+kbd { font: 11px/1 var(--font-ui); padding: 2px 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--panel); }
+h2 { margin: 0; font-size: 14px; font-weight: 650; }
+
+.top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-block: 12px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; }
+.brand h1 { margin: 0; font-size: 16px; font-weight: 650; text-wrap: balance; }
+.brand p { margin: 0; font-size: 12px; color: var(--muted); }
+.nav { display: flex; gap: 4px; background: var(--panel-2); padding: 3px; border-radius: 12px; }
+.nav button { border: 0; background: transparent; padding: 6px 14px; border-radius: 9px; color: var(--muted); font-weight: 600; }
+.nav button.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.count { font-size: 11px; background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+.count:empty { display: none; }
+.status { margin-left: auto; color: var(--muted); font-size: 13px; min-width: 0; text-align: right; }
+.status.error { color: var(--red); }
+.theme-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+
+.banner { margin-top: 14px; display: flex; gap: 12px; align-items: flex-start; background: var(--demo-bg); border: 1px solid var(--demo); border-radius: var(--radius); padding: 12px 14px; }
+.banner strong { color: var(--demo); display: block; }
+.banner p { margin: 2px 0 0; max-width: 78ch; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 999px; background: var(--demo); color: var(--bg); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; flex-shrink: 0; margin-top: 2px; }
+.win-only { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; margin-top: 16px; align-items: start; }
+.stage { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.preview-wrap { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; background: var(--well); border: 1px solid var(--line); border-radius: var(--radius); display: grid; place-items: center; overflow: hidden; }
+#preview { width: 100%; height: 100%; object-fit: contain; display: block; touch-action: none; }
+.preview-hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(18, 49, 58, .8); color: #EAF4F1; font-size: 12px; padding: 4px 12px; border-radius: 999px; pointer-events: none; white-space: nowrap; max-width: 94%; overflow: hidden; text-overflow: ellipsis; }
+.countdown { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(64px, 14vw, 120px); font-weight: 700; color: #C3F44D; background: rgba(10, 30, 35, .55); }
+.rec-badge { position: absolute; top: 12px; right: 12px; background: #E5484D; color: #fff; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: .06em; }
+
+.actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn-record { display: inline-flex; align-items: center; gap: 10px; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 15px; }
+.btn-record .dot { width: 12px; height: 12px; border-radius: 50%; background: #E5484D; }
+.btn-stop { padding: 10px 20px; border: 0; border-radius: 999px; background: var(--red); color: #fff; font-weight: 700; }
+.btn-ghost { padding: 8px 15px; border-radius: 999px; background: transparent; border: 1px solid var(--line); color: var(--text); text-decoration: none; display: inline-flex; align-items: center; }
+.btn-ghost:hover { border-color: var(--accent-strong); }
+.btn-ghost.off { border-color: var(--red); color: var(--red); }
+.btn-outline { padding: 8px 15px; border-radius: 999px; background: transparent; border: 1px solid var(--accent-strong); color: var(--accent-strong); font-weight: 600; }
+.timer { font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; min-width: 74px; color: var(--muted); }
+.timer.live { color: var(--text); }
+.timer.live::before { content: "● "; color: var(--red); font-size: 14px; vertical-align: 2px; }
+.kbd-hint { color: var(--muted); font-size: 12px; margin-left: auto; }
+body.recording .kbd-hint { display: none; }
+
+.result { background: var(--panel); border: 1px solid var(--green); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.result h2 { color: var(--green); font-size: 15px; }
+.result video { width: 100%; max-width: 100%; border-radius: 10px; background: #000; }
+.meta { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.panel { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 13px; display: flex; flex-direction: column; gap: 9px; }
+.source-name { background: var(--bg); border-radius: 10px; padding: 8px 10px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; border: 1px solid var(--line); }
+.source-name.set { color: var(--text); }
+select { width: 100%; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+input[type="range"] { accent-color: var(--accent-strong); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.row input[type="range"] { flex: 1; max-width: 180px; min-width: 0; }
+.label { color: var(--muted); font-size: 13px; }
+.seg { display: inline-flex; background: var(--bg); border-radius: 10px; padding: 3px; border: 1px solid var(--line); }
+.seg button { border: 0; background: transparent; padding: 5px 11px; border-radius: 8px; color: var(--muted); }
+.seg button.active { background: var(--accent); color: var(--accent-ink); font-weight: 650; }
+.seg.wide { display: grid; grid-template-columns: 1fr 1fr; }
+.meter { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; border: 1px solid var(--line); }
+#micLevel { height: 100%; width: 0; background: linear-gradient(90deg, #61D384, #C3F44D); }
+.switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch .track { width: 36px; height: 20px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); position: relative; flex-shrink: 0; transition: background .15s; }
+.switch .knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform .15s; }
+.switch input:checked + .track { background: var(--green); border-color: var(--green); }
+.switch input:checked + .track .knob { transform: translateX(16px); background: #fff; }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+.switch input:disabled ~ * { opacity: .5; }
+.switch.disabled { cursor: default; }
+.hint { margin: 0; color: var(--muted); font-size: 12px; }
+body.recording .panel { pointer-events: none; opacity: .5; }
+
+.lib { margin-top: 16px; }
+.lib-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.lib-head h2 { font-size: 18px; }
+.lib-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; max-width: 70ch; }
+.lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.lib-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+.lib-thumb { aspect-ratio: 16/9; background: var(--well); display: grid; place-items: center; color: var(--muted); font-size: 13px; position: relative; }
+.lib-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lib-thumb .dur { position: absolute; right: 8px; bottom: 8px; background: rgba(0,0,0,.7); color: #fff; font-size: 12px; padding: 1px 7px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.lib-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lib-name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-btns { display: flex; gap: 6px; padding: 0 12px 12px; flex-wrap: wrap; }
+.lib-btns > * { padding: 5px 11px; font-size: 13px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 50px 20px; color: var(--muted); text-align: center; background: var(--panel); border: 1px dashed var(--line); border-radius: var(--radius); }
+.empty-state strong { color: var(--text); font-size: 16px; }
+
+.tour { position: fixed; inset: 0; z-index: 60; }
+.tour-ring { position: fixed; border-radius: 14px; box-shadow: 0 0 0 4px #C3F44D, 0 0 0 9999px rgba(8, 22, 26, .6); transition: all .25s; pointer-events: none; }
+.tour-tip { position: fixed; width: min(300px, calc(100vw - 32px)); background: var(--panel); color: var(--text); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
+.tour-tip p { margin: 0; color: var(--muted); }
+.tour-step { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tour-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.tour-actions .spacer { flex: 1; }
+.link { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; font-size: 12px; }
+.btn-solid { padding: 7px 15px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); border: 0; font-weight: 650; }
+
+.foot { margin-top: 20px; color: var(--muted); font-size: 12px; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } .kbd-hint { display: none; } .status { margin-left: 0; text-align: left; width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .switch .track, .switch .knob, .tour-ring { transition: none; } }
+</style>
+
+<header class="top">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+      <rect width="64" height="64" rx="14" fill="#1A434E"/>
+      <rect x="12" y="16" width="40" height="27" rx="4" fill="none" stroke="#C3F44D" stroke-width="3.5"/>
+      <rect x="28" y="43" width="8" height="6" fill="#C3F44D"/>
+      <rect x="21" y="48" width="22" height="3.5" rx="1.75" fill="#C3F44D"/>
+      <circle cx="23" cy="26" r="4.5" fill="#FF5A5F"/>
+      <circle cx="46" cy="40" r="11" fill="#1A434E"/>
+      <circle cx="46" cy="40" r="9.5" fill="#61D384"/>
+      <circle cx="46" cy="37" r="3.2" fill="#1A434E"/>
+      <path d="M39.5 46.5a6.5 6.5 0 0 1 13 0z" fill="#1A434E"/>
+    </svg>
+    <div>
+      <h1>NextGen Screen Recorder</h1>
+      <p>by NextGenIT · web prototype v0.2</p>
+    </div>
+  </div>
+  <nav class="nav" aria-label="Sections">
+    <button class="active" data-view="record" id="navRecord">Record</button>
+    <button data-view="library" id="navLibrary">Library <span class="count" id="libCount"></span></button>
+  </nav>
+  <button class="theme-btn" id="themeBtn" title="Switch light or dark">Theme</button>
+  <div class="status" id="status" role="status">Getting ready…</div>
+</header>
+
+<div class="banner" id="demoBanner" hidden>
+  <span class="pill">Demo</span>
+  <div>
+    <strong>Preview mode: nothing is recorded here</strong>
+    <p>Pages opened from a Claude link may not use your screen, camera or microphone, so this view shows a sample screen and presenter. Try the area tool, camera dragging, blur and the recording controls. To record for real, open the <b>NextGen-Recorder.html</b> file in Chrome or Edge, or install the Windows app.</p>
+  </div>
+</div>
+
+<main id="view-record" class="layout">
+  <section class="stage">
+    <div class="preview-wrap">
+      <canvas id="preview" width="1280" height="720" aria-label="Live preview of the recording"></canvas>
+      <div class="countdown" id="countdown" hidden>3</div>
+      <div class="rec-badge" id="recBadge" hidden>REC</div>
+      <div class="preview-hint" id="previewHint">Drag the camera to move it · scroll over it to resize</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-record" id="recordBtn" disabled><span class="dot"></span><span id="recordLabel">Start recording</span></button>
+      <div class="timer" id="timer">00:00</div>
+      <button class="btn-ghost" id="pauseBtn" hidden>Pause</button>
+      <button class="btn-ghost" id="muteBtn" hidden>Mute mic</button>
+      <button class="btn-ghost" id="camBtn" hidden>Hide camera</button>
+      <button class="btn-stop" id="stopBtn" hidden>Stop &amp; save</button>
+      <span class="kbd-hint">Shortcuts: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> record · <kbd>P</kbd> pause · <kbd>M</kbd> mute · <kbd>C</kbd> camera</span>
+    </div>
+
+    <div class="result" id="result" hidden>
+      <h2 id="resultTitle">Recording ready</h2>
+      <video id="resultVideo" controls playsinline hidden></video>
+      <div class="meta" id="resultMeta"></div>
+      <div class="row-actions">
+        <a class="btn-ghost" id="downloadLink" hidden>Download video</a>
+        <button class="btn-ghost" id="resultClose">Close</button>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="card" id="cardSource">
+      <h2>What to record</h2>
+      <div class="seg wide" id="modeSeg"><button data-mode="screen">Screen or window</button><button data-mode="area">Area</button></div>
+      <div class="source-name" id="sourceName">Nothing chosen yet</div>
+      <button class="btn-outline" id="pickBtn">Choose screen, window or tab</button>
+      <div class="row" id="areaRow" hidden>
+        <span class="label" id="areaLabel">No area selected</span>
+        <button class="btn-outline" id="areaBtn">Select area</button>
+      </div>
+      <p class="hint" id="srcHint">Your browser shows its own list. For computer sound, pick <b>Entire screen</b> or a <b>tab</b> and tick <b>Share audio</b>.</p>
+    </div>
+
+    <div class="card" id="cardCamera">
+      <h2>Camera</h2>
+      <button class="btn-outline" id="allowBtn">Allow camera and microphone</button>
+      <select id="camSelect" aria-label="Camera" hidden></select>
+      <div class="row">
+        <span class="label">Shape</span>
+        <div class="seg" id="shapeSeg"><button data-shape="circle">Circle</button><button data-shape="rounded">Rounded</button></div>
+      </div>
+      <div class="row">
+        <label class="label" for="sizeRange">Size</label>
+        <input type="range" id="sizeRange" min="12" max="50" step="1">
+      </div>
+      <label class="switch"><input type="checkbox" id="blurChk"><span class="track"><span class="knob"></span></span><span>Blur my background</span></label>
+      <p class="hint" id="blurHint" hidden></p>
+    </div>
+
+    <div class="card" id="cardSound">
+      <h2>Sound</h2>
+      <select id="micSelect" aria-label="Microphone" hidden></select>
+      <p class="hint" id="micHint">Allow the camera and microphone above to choose a microphone.</p>
+      <div class="meter" aria-hidden="true"><div id="micLevel"></div></div>
+      <label class="switch"><input type="checkbox" id="sysAudio"><span class="track"><span class="knob"></span></span><span>Include computer sound</span></label>
+      <p class="hint">Use headphones so your speakers do not echo into the microphone.</p>
+    </div>
+
+    <div class="card">
+      <h2>Presenter tools</h2>
+      <label class="switch disabled"><input type="checkbox" disabled><span class="track"><span class="knob"></span></span><span>Draw on screen <span class="win-only">Windows app</span></span></label>
+      <label class="switch disabled"><input type="checkbox" disabled><span class="track"><span class="knob"></span></span><span>Highlight pointer and clicks <span class="win-only">Windows app</span></span></label>
+      <p class="hint">Browsers can't draw over other apps or track clicks outside the page, so these live in the Windows app.</p>
+    </div>
+
+    <div class="card" id="cardQuality">
+      <h2>Quality</h2>
+      <div class="seg wide" id="qualitySeg"><button data-q="720">720p · smaller</button><button data-q="1080">1080p · sharper</button></div>
+      <div class="seg wide" id="fpsSeg"><button data-fps="30">30 fps</button><button data-fps="60">60 fps · smoother</button></div>
+      <label class="switch"><input type="checkbox" id="countdownChk"><span class="track"><span class="knob"></span></span><span>3-second countdown</span></label>
+      <label class="switch" id="pipRow"><input type="checkbox" id="pipChk"><span class="track"><span class="knob"></span></span><span>Floating controls window</span></label>
+      <p class="hint" id="pipHint">A small always-on-top Pause/Mute/Stop window. In the web version it shows in whole-screen recordings; the Windows app hides it.</p>
+    </div>
+  </aside>
+</main>
+
+<main id="view-library" class="lib" hidden>
+  <div class="lib-head">
+    <div>
+      <h2>Your recordings</h2>
+      <p>In the web version, recordings are kept only until you close this tab, so download the ones you want. The Windows app keeps a permanent library with trim, GIF and smaller-copy tools.</p>
+    </div>
+  </div>
+  <div class="lib-grid" id="libGrid"></div>
+  <div class="empty-state" id="libEmpty">
+    <strong>No recordings yet</strong>
+    <span>Press Start recording on the Record tab. Each recording appears here.</span>
+  </div>
+</main>
+
+<div class="tour" id="tour" hidden>
+  <div class="tour-ring" id="tourRing"></div>
+  <div class="tour-tip" id="tourTip" role="dialog" aria-live="polite">
+    <span class="tour-step" id="tourStep"></span>
+    <strong id="tourTitle"></strong>
+    <p id="tourText"></p>
+    <div class="tour-actions"><button class="link" id="tourSkip">Skip tour</button><span class="spacer"></span><button class="btn-ghost" id="tourBack">Back</button><button class="btn-solid" id="tourNext">Next</button></div>
+  </div>
+</div>
+
+<p class="foot">NextGen Screen Recorder web prototype v0.2 · Chrome and Edge on Windows · free, no time limit, no watermark · videos never leave your computer.</p>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const FRAMED = (() => { try { return window.self !== window.top; } catch { return true; } })();
+const CAN_CAPTURE = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+let demo = FRAMED || !CAN_CAPTURE;
+const MP_VER = '1.2.2';
+const MP_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}`;
+const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
+
+// ---------- settings (this browser only) ----------
+const S = Object.assign({
+  camId: '', micId: '', systemAudio: true, quality: '1080', fps: 30, countdown: true, pip: true,
+  camShape: 'circle', camSize: 0.27, camX: 0.86, camY: 0.8, blur: false, mode: 'screen', area: null, theme: '', tourDone: false,
+}, load());
+function load() { try { return JSON.parse(localStorage.getItem('ngr-web-2') || '{}'); } catch { return {}; } }
+function save() { try { localStorage.setItem('ngr-web-2', JSON.stringify(S)); } catch { /* storage blocked */ } }
+
+// ---------- state ----------
+const canvas = $('preview');
+const ctx = canvas.getContext('2d', { alpha: false });
+const screenVid = makeVideo();
+const camVid = makeVideo();
+let screenStream = null, camStream = null, micStream = null;
+let audioCtx = null, micAnalyser = null, micGain = null, mixNodes = [];
+let mr = null, chunks = [], ext = 'mp4';
+let startedAt = 0, pausedAt = 0, pausedTotal = 0, uiTimer = null, pipWin = null;
+let demoRecording = false, demoPaused = false, counting = false;
+let muted = false, camOn = true;
+let selecting = false, selStart = null, selRect = null;
+let segmenter = null, segLoading = false, lastSeg = 0;
+const recordings = [];
+const maskCanvas = document.createElement('canvas'), maskCtx = maskCanvas.getContext('2d');
+const personCanvas = document.createElement('canvas'), personCtx = personCanvas.getContext('2d');
+
+function makeVideo() { const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.autoplay = true; return v; }
+function setStatus(msg, err = false) { const el = $('status'); el.textContent = msg; el.classList.toggle('error', err); }
+function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
+function stopStream(s) { if (s) s.getTracks().forEach((t) => t.stop()); }
+const isRecording = () => !!mr || demoRecording;
+
+// ---------- steady clock (keeps drawing when the tab is in the background) ----------
+let ticker = null;
+function startTicker() {
+  const ms = Math.round(1000 / (Number(S.fps) || 30));
+  try {
+    if (!ticker) {
+      const src = 'let i;onmessage=e=>{clearInterval(i);if(e.data)i=setInterval(()=>postMessage(0),e.data)}';
+      ticker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      ticker.onmessage = draw;
+    }
+    ticker.postMessage(ms);
+  } catch { if (!ticker) { ticker = { fallback: setInterval(draw, ms) }; } }
+}
+
+// ---------- geometry ----------
+function fullSize() {
+  if (demo) return Number(S.quality) === 720 ? { w: 1280, h: 720 } : { w: 1920, h: 1080 };
+  return { w: screenVid.videoWidth, h: screenVid.videoHeight };
+}
+function srcRect() {
+  const f = fullSize();
+  if (!f.w || !f.h) return null;
+  if (S.mode === 'area' && S.area && !selecting) {
+    return { x: Math.round(S.area.x * f.w), y: Math.round(S.area.y * f.h), w: Math.max(2, Math.round(S.area.w * f.w)), h: Math.max(2, Math.round(S.area.h * f.h)), fw: f.w, fh: f.h };
+  }
+  return { x: 0, y: 0, w: f.w, h: f.h, fw: f.w, fh: f.h };
+}
+function fitCanvas(src) {
+  const maxH = Number(S.quality), maxW = Math.round(maxH * 16 / 9);
+  const k = Math.min(1, maxH / src.h, maxW / src.w);
+  const w = Math.max(2, Math.round(src.w * k / 2) * 2), h = Math.max(2, Math.round(src.h * k / 2) * 2);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+}
+function bubbleRect() {
+  const w = canvas.width, h = canvas.height, short = Math.min(w, h), d = Math.round(short * S.camSize);
+  const cx = Math.min(w - d / 2, Math.max(d / 2, S.camX * w)), cy = Math.min(h - d / 2, Math.max(d / 2, S.camY * h));
+  return { x: cx - d / 2, y: cy - d / 2, d };
+}
+
+// ---------- drawing ----------
+const demoScreen = document.createElement('canvas');
+function draw() {
+  const t = performance.now() / 1000;
+  const src = srcRect();
+  if (demo && src) {
+    if (demoScreen.width !== src.fw) { demoScreen.width = src.fw; demoScreen.height = src.fh; }
+    paintDemoScreen(demoScreen.getContext('2d'), src.fw, src.fh, t);
+    fitCanvas(src);
+    ctx.drawImage(demoScreen, src.x, src.y, src.w, src.h, 0, 0, canvas.width, canvas.height);
+  } else if (screenStream && screenVid.readyState >= 2 && src) {
+    fitCanvas(src);
+    ctx.drawImage(screenVid, src.x, src.y, src.w, src.h, 0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.fillStyle = '#0A1E23'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#A8C3C2'; ctx.textAlign = 'center';
+    ctx.font = Math.round(canvas.height / 22) + 'px Segoe UI, sans-serif';
+    ctx.fillText('Choose a screen, window or tab on the right', canvas.width / 2, canvas.height / 2);
+  }
+  if (selecting) drawSelection();
+  else if (camOn && (demo ? S.camId !== 'none' : (camStream && camVid.readyState >= 2))) drawBubble(t);
+  updateMeter(t);
+}
+
+function drawSelection() {
+  const w = canvas.width, h = canvas.height;
+  ctx.fillStyle = 'rgba(10, 30, 35, .55)';
+  if (!selRect) { ctx.fillRect(0, 0, w, h); }
+  else {
+    const r = selRect;
+    ctx.fillRect(0, 0, w, r.y); ctx.fillRect(0, r.y + r.h, w, h - r.y - r.h);
+    ctx.fillRect(0, r.y, r.x, r.h); ctx.fillRect(r.x + r.w, r.y, w - r.x - r.w, r.h);
+    ctx.strokeStyle = '#C3F44D'; ctx.lineWidth = Math.max(2, w / 500); ctx.strokeRect(r.x, r.y, r.w, r.h);
+  }
+  ctx.fillStyle = '#EAF4F1'; ctx.textAlign = 'center'; ctx.font = `600 ${Math.round(h / 26)}px Segoe UI, sans-serif`;
+  ctx.fillText(selRect ? 'Release to use this area' : 'Drag over the part of the screen to record', w / 2, Math.round(h / 12));
+}
+
+function shapePath(c, x, y, d) {
+  c.beginPath();
+  if (S.camShape === 'rounded') {
+    const r = d * 0.18;
+    c.moveTo(x + r, y); c.arcTo(x + d, y, x + d, y + d, r); c.arcTo(x + d, y + d, x, y + d, r); c.arcTo(x, y + d, x, y, r); c.arcTo(x, y, x + d, y, r); c.closePath();
+  } else c.arc(x + d / 2, y + d / 2, d / 2, 0, Math.PI * 2);
+}
+function drawBubble(t) {
+  const { x, y, d } = bubbleRect();
+  ctx.save();
+  shapePath(ctx, x, y, d);
+  ctx.clip();
+  if (demo) paintDemoCam(x, y, d, t);
+  else paintCam(x, y, d);
+  ctx.restore();
+  shapePath(ctx, x + 1, y + 1, d - 2);
+  ctx.lineWidth = Math.max(3, Math.round(d * 0.025)); ctx.strokeStyle = '#C3F44D'; ctx.stroke();
+}
+function paintCam(x, y, d) {
+  const cw = camVid.videoWidth, ch = camVid.videoHeight, side = Math.min(cw, ch), sx = (cw - side) / 2, sy = (ch - side) / 2;
+  ctx.translate(x + d, y); ctx.scale(-1, 1);
+  const useBlur = S.blur && segmenter && maskCanvas.width > 0;
+  if (S.blur && !segmenter && !segLoading) loadSegmenter();
+  if (useBlur) {
+    runSegmentation();
+    ctx.filter = `blur(${Math.max(6, Math.round(d / 22))}px)`;
+    ctx.drawImage(camVid, sx, sy, side, side, -8, -8, d + 16, d + 16);
+    ctx.filter = 'none';
+    if (personCanvas.width !== d) { personCanvas.width = d; personCanvas.height = d; }
+    personCtx.globalCompositeOperation = 'source-over';
+    personCtx.clearRect(0, 0, d, d);
+    personCtx.drawImage(camVid, sx, sy, side, side, 0, 0, d, d);
+    personCtx.globalCompositeOperation = 'destination-in';
+    const mw = maskCanvas.width, mh = maskCanvas.height;
+    personCtx.filter = 'blur(2px)';
+    personCtx.drawImage(maskCanvas, sx / cw * mw, sy / ch * mh, side / cw * mw, side / ch * mh, 0, 0, d, d);
+    personCtx.filter = 'none';
+    ctx.drawImage(personCanvas, 0, 0, d, d);
+  } else ctx.drawImage(camVid, sx, sy, side, side, 0, 0, d, d);
+}
+
+// demo painters: a sample slide with a moving cursor, and a sample presenter in front of a bookshelf
+function paintDemoScreen(c, w, h, t) {
+  const u = h / 720;
+  c.fillStyle = '#E9EFEE'; c.fillRect(0, 0, w, h);
+  c.fillStyle = '#1A434E'; c.fillRect(0, 0, w, 44 * u);
+  ['#FF5A5F', '#C3F44D', '#61D384'].forEach((col, i) => { c.fillStyle = col; c.beginPath(); c.arc((24 + i * 22) * u, 22 * u, 7 * u, 0, 7); c.fill(); });
+  c.fillStyle = '#EAF4F1'; c.textAlign = 'left'; c.font = `${16 * u}px Segoe UI, sans-serif`;
+  c.fillText('Sample slide — training session', 100 * u, 28 * u);
+  c.fillStyle = '#12313A'; c.font = `600 ${40 * u}px Segoe UI, sans-serif`;
+  c.fillText('Sample chart', 80 * u, 130 * u);
+  c.fillStyle = '#4A6B70'; c.font = `${20 * u}px Segoe UI, sans-serif`;
+  c.fillText('Demo content only — not real data', 80 * u, 168 * u);
+  const base = 620 * u, bw = 90 * u;
+  [0.45, 0.6, 0.52, 0.75, 0.68, 0.88].forEach((v, i) => {
+    const grow = Math.min(1, Math.max(0, (t % 8) - i * 0.25));
+    const bh = 360 * u * v * (0.2 + 0.8 * grow);
+    c.fillStyle = i === 5 ? '#61D384' : '#1A434E';
+    c.fillRect(80 * u + i * (bw + 30 * u), base - bh, bw, bh);
+  });
+  c.fillStyle = '#B9C9C8'; c.fillRect(80 * u, base, 720 * u, 2 * u);
+  c.fillStyle = '#FFFFFF'; c.fillRect(880 * u, 200 * u, 320 * u, 300 * u);
+  c.fillStyle = '#12313A'; c.font = `600 ${22 * u}px Segoe UI, sans-serif`; c.fillText('Key points', 905 * u, 245 * u);
+  c.fillStyle = '#4A6B70'; c.font = `${17 * u}px Segoe UI, sans-serif`;
+  ['• Record any area', '• Camera you can move', '• Blur the background', '• Pause, mute, resume'].forEach((s, i) => c.fillText(s, 905 * u, (290 + i * 40) * u));
+  const cx = (560 + Math.cos(t * 0.9) * 260) * u, cy = (380 + Math.sin(t * 1.3) * 140) * u;
+  c.fillStyle = '#12313A'; c.strokeStyle = '#fff'; c.lineWidth = 2 * u;
+  c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx, cy + 26 * u); c.lineTo(cx + 7 * u, cy + 19 * u); c.lineTo(cx + 18 * u, cy + 19 * u); c.closePath(); c.fill(); c.stroke();
+}
+function paintDemoCam(x, y, d, t) {
+  ctx.save();
+  if (S.blur) ctx.filter = `blur(${Math.max(4, Math.round(d / 26))}px)`;
+  ctx.fillStyle = '#C9B98F'; ctx.fillRect(x - 10, y - 10, d + 20, d + 20);
+  const cols = ['#7A4E2D', '#2E6B8A', '#B23A48', '#3D7A4F', '#D9A441', '#6E56CF'];
+  for (let r = 0; r < 3; r++) {
+    ctx.fillStyle = '#8B6B43'; ctx.fillRect(x - 10, y + d * (0.3 + r * 0.3), d + 20, d * 0.03);
+    for (let b = 0; b < 9; b++) { ctx.fillStyle = cols[(b + r * 2) % cols.length]; ctx.fillRect(x + b * d * 0.115, y + d * (0.1 + r * 0.3), d * 0.08, d * 0.2); }
+  }
+  ctx.restore();
+  const bob = Math.sin(t * 2) * d * 0.01, cx = x + d / 2;
+  ctx.fillStyle = '#1A434E';
+  ctx.beginPath(); ctx.ellipse(cx, y + d * 0.98 + bob, d * 0.36, d * 0.3, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#E0B48A';
+  ctx.beginPath(); ctx.arc(cx, y + d * 0.42 + bob, d * 0.16, 0, 7); ctx.fill();
+  ctx.fillStyle = '#2B211C';
+  ctx.beginPath(); ctx.arc(cx, y + d * 0.37 + bob, d * 0.165, Math.PI, 0); ctx.fill();
+}
+
+// ---------- background blur (runs in this browser; model loads from Google's public file store) ----------
+async function loadSegmenter() {
+  segLoading = true;
+  $('blurHint').hidden = false;
+  $('blurHint').textContent = 'Loading background blur (about 15 MB, first time only)…';
+  try {
+    const vision = await import(`${MP_BASE}/vision_bundle.mjs`);
+    const files = await vision.FilesetResolver.forVisionTasks(`${MP_BASE}/wasm`);
+    for (const delegate of ['GPU', 'CPU']) {
+      try {
+        segmenter = await vision.ImageSegmenter.createFromOptions(files, { baseOptions: { modelAssetPath: MODEL_URL, delegate }, runningMode: 'VIDEO', outputCategoryMask: false, outputConfidenceMasks: true });
+        break;
+      } catch { segmenter = null; }
+    }
+    $('blurHint').textContent = segmenter ? 'Background blur is on. It uses more processing power.' : 'Background blur could not start in this browser.';
+  } catch { $('blurHint').textContent = 'Background blur needs an internet connection the first time.'; }
+  segLoading = false;
+}
+let maskData = null;
+function runSegmentation() {
+  const now = performance.now();
+  if (now - lastSeg < 66) return;
+  lastSeg = now;
+  try {
+    segmenter.segmentForVideo(camVid, now, (res) => {
+      const m = res.confidenceMasks && res.confidenceMasks[0];
+      if (!m) return;
+      const f = m.getAsFloat32Array();
+      if (maskCanvas.width !== m.width || maskCanvas.height !== m.height) { maskCanvas.width = m.width; maskCanvas.height = m.height; maskData = maskCtx.createImageData(m.width, m.height); }
+      for (let i = 0, j = 3; i < f.length; i++, j += 4) maskData.data[j] = f[i] * 255;
+      maskCtx.putImageData(maskData, 0, 0);
+    });
+  } catch { /* skip a frame */ }
+}
+
+const meterBuf = new Uint8Array(1024);
+function updateMeter(t) {
+  let level = 0;
+  if (muted) level = 0;
+  else if (demo) level = S.micId === 'none' ? 0 : 25 + 35 * Math.abs(Math.sin(t * 3.1) * Math.sin(t * 1.7));
+  else if (micAnalyser) {
+    micAnalyser.getByteTimeDomainData(meterBuf);
+    let p = 0; for (let i = 0; i < meterBuf.length; i += 4) p = Math.max(p, Math.abs(meterBuf[i] - 128));
+    level = Math.min(100, p / 128 * 160);
+  }
+  $('micLevel').style.width = level + '%';
+}
+
+// ---------- preview interaction: camera drag/resize, area selection ----------
+function canvasPoint(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height }; }
+function bubbleVisible() { return camOn && (demo ? S.camId !== 'none' : !!camStream); }
+function overBubble(p) { if (!bubbleVisible()) return false; const b = bubbleRect(); return p.x >= b.x && p.x <= b.x + b.d && p.y >= b.y && p.y <= b.y + b.d; }
+let dragOff = null;
+canvas.addEventListener('pointerdown', (e) => {
+  const p = canvasPoint(e);
+  if (selecting) { selStart = p; selRect = null; canvas.setPointerCapture(e.pointerId); return; }
+  if (!overBubble(p)) return;
+  const b = bubbleRect();
+  dragOff = { dx: p.x - (b.x + b.d / 2), dy: p.y - (b.y + b.d / 2) };
+  canvas.setPointerCapture(e.pointerId);
+  canvas.style.cursor = 'grabbing';
+});
+canvas.addEventListener('pointermove', (e) => {
+  const p = canvasPoint(e);
+  if (selecting) {
+    canvas.style.cursor = 'crosshair';
+    if (selStart) selRect = { x: Math.min(selStart.x, p.x), y: Math.min(selStart.y, p.y), w: Math.abs(p.x - selStart.x), h: Math.abs(p.y - selStart.y) };
+    return;
+  }
+  if (dragOff) { S.camX = Math.min(1, Math.max(0, (p.x - dragOff.dx) / canvas.width)); S.camY = Math.min(1, Math.max(0, (p.y - dragOff.dy) / canvas.height)); }
+  else canvas.style.cursor = overBubble(p) ? 'grab' : 'default';
+});
+canvas.addEventListener('pointerup', () => {
+  if (selecting) {
+    if (selRect && selRect.w > canvas.width * 0.05 && selRect.h > canvas.height * 0.05) {
+      S.area = { x: selRect.x / canvas.width, y: selRect.y / canvas.height, w: selRect.w / canvas.width, h: selRect.h / canvas.height };
+      save();
+      setStatus('Area selected. Ready to record.');
+    }
+    selecting = false; selStart = null; selRect = null; canvas.style.cursor = 'default';
+    $('previewHint').textContent = 'Drag the camera to move it · scroll over it to resize';
+    renderArea(); updateButtons();
+    return;
+  }
+  if (dragOff) { dragOff = null; canvas.style.cursor = 'grab'; save(); }
+});
+canvas.addEventListener('wheel', (e) => {
+  if (selecting || !overBubble(canvasPoint(e))) return;
+  e.preventDefault();
+  setCamSize(S.camSize + (e.deltaY < 0 ? 0.02 : -0.02));
+}, { passive: false });
+function setCamSize(v) { S.camSize = Math.min(0.5, Math.max(0.12, v)); $('sizeRange').value = Math.round(S.camSize * 100); save(); }
+
+function startAreaSelect() {
+  if (!demo && !screenStream) { setStatus('Choose your screen first, then select an area.', true); return; }
+  selecting = true; selRect = null;
+  $('previewHint').textContent = 'Drag on the preview to choose the area';
+  setStatus('Drag on the preview to choose the area to record.');
+}
+function renderArea() {
+  $('areaRow').hidden = S.mode !== 'area';
+  if (S.mode !== 'area') return;
+  const f = fullSize();
+  $('areaLabel').textContent = S.area && f.w ? `Area ${Math.round(S.area.w * f.w)} × ${Math.round(S.area.h * f.h)}` : 'No area selected';
+  $('areaBtn').textContent = S.area ? 'Change area' : 'Select area';
+}
+function setMode(m) {
+  if (isRecording()) return;
+  S.mode = m; save();
+  mark('modeSeg', 'mode', m);
+  renderArea();
+  if (m === 'area' && !S.area) setStatus(demo || screenStream ? 'Click “Select area”, then drag on the preview.' : 'Choose your screen first, then select an area.');
+  updateButtons();
+}
+
+// ---------- capture ----------
+function getAC() { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume(); return audioCtx; }
+async function pickSource() {
+  if (demo) { setStatus('Demo mode: the sample screen is already chosen.'); return; }
+  try {
+    const s = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: { ideal: Number(S.fps) || 30 } }, audio: S.systemAudio,
+      systemAudio: S.systemAudio ? 'include' : 'exclude', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
+    });
+    stopStream(screenStream);
+    screenStream = s; screenVid.srcObject = s;
+    await screenVid.play().catch(() => {});
+    const vt = s.getVideoTracks()[0];
+    vt.addEventListener('ended', onScreenEnded);
+    const kind = vt.getSettings().displaySurface;
+    $('sourceName').textContent = kind === 'monitor' || /^screen:/.test(vt.label) ? 'Whole screen' : (kind === 'browser' ? 'Browser tab: ' : 'Window: ') + (vt.label || 'selected');
+    $('sourceName').classList.add('set');
+    const hasSys = s.getAudioTracks().length > 0;
+    setStatus(S.mode === 'area' && !S.area ? 'Now click “Select area”.' : S.systemAudio && !hasSys ? 'Ready. No computer sound: pick Entire screen or a tab and tick “Share audio”.' : 'Ready to record.');
+  } catch (e) {
+    if (e && e.name === 'NotAllowedError' && FRAMED) return enterDemo();
+    setStatus(e && e.name === 'NotAllowedError' ? 'Screen sharing was cancelled. Click “Choose screen, window or tab” to try again.' : 'Could not capture the screen. Try again.', true);
+  }
+  renderArea(); updateButtons();
+}
+function onScreenEnded() {
+  if (mr) stopRecording();
+  screenStream = null;
+  $('sourceName').textContent = 'Sharing stopped. Choose again to record.'; $('sourceName').classList.remove('set');
+  updateButtons();
+}
+async function allowDevices() {
+  if (demo) return;
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: true }).catch(() => navigator.mediaDevices.getUserMedia({ audio: true }));
+    stopStream(s);
+  } catch {
+    if (FRAMED) return enterDemo();
+    setStatus('Camera and microphone were blocked. Click the camera icon in the address bar to allow them.', true);
+    return;
+  }
+  await loadDevices();
+  await Promise.all([startCam(), startMic()]);
+}
+async function loadDevices() {
+  const list = await navigator.mediaDevices.enumerateDevices();
+  fill($('camSelect'), list.filter((d) => d.kind === 'videoinput'), 'camId', 'No camera', 'Camera');
+  fill($('micSelect'), list.filter((d) => d.kind === 'audioinput'), 'micId', 'No microphone', 'Microphone');
+  $('allowBtn').hidden = true; $('camSelect').hidden = false; $('micSelect').hidden = false; $('micHint').hidden = true;
+}
+function fill(sel, list, key, none, fallback) {
+  sel.innerHTML = '';
+  sel.add(new Option(none, 'none'));
+  list.forEach((d, i) => sel.add(new Option(d.label || `${fallback} ${i + 1}`, d.deviceId)));
+  const ids = list.map((d) => d.deviceId);
+  sel.value = S[key] === 'none' ? 'none' : ids.includes(S[key]) ? S[key] : (ids.includes('default') ? 'default' : (ids[0] || 'none'));
+  S[key] = sel.value;
+}
+async function startCam() {
+  stopStream(camStream); camStream = null;
+  if (demo || !S.camId || S.camId === 'none') return;
+  try { camStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: S.camId }, width: { ideal: 1280 }, height: { ideal: 720 } } }); camVid.srcObject = camStream; await camVid.play().catch(() => {}); }
+  catch { setStatus('Camera could not start. Close other apps using it (Zoom, Teams) and choose it again.', true); }
+}
+async function startMic() {
+  stopStream(micStream); micStream = null; micAnalyser = null;
+  if (demo || !S.micId || S.micId === 'none') return;
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: S.micId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    const ac = getAC(); micAnalyser = ac.createAnalyser(); micAnalyser.fftSize = 2048;
+    ac.createMediaStreamSource(micStream).connect(micAnalyser);
+  } catch { setStatus('Microphone could not start. Check Windows privacy settings for the microphone.', true); }
+}
+
+// ---------- demo mode ----------
+function enterDemo() {
+  demo = true;
+  $('demoBanner').hidden = false;
+  stopStream(screenStream); screenStream = null;
+  $('sourceName').textContent = 'Sample screen (demo)'; $('sourceName').classList.add('set');
+  $('pickBtn').disabled = true; $('allowBtn').hidden = true;
+  const cam = $('camSelect'), mic = $('micSelect');
+  cam.innerHTML = ''; cam.add(new Option('Sample camera (demo)', 'demo')); cam.add(new Option('No camera', 'none'));
+  mic.innerHTML = ''; mic.add(new Option('Sample microphone (demo)', 'demo')); mic.add(new Option('No microphone', 'none'));
+  S.camId = S.camId === 'none' ? 'none' : 'demo'; S.micId = S.micId === 'none' ? 'none' : 'demo';
+  cam.value = S.camId; mic.value = S.micId;
+  cam.hidden = false; mic.hidden = false; $('micHint').hidden = true;
+  setStatus('Demo mode: try the options and the recording controls.');
+  renderArea(); updateButtons();
+}
+
+// ---------- recording ----------
+function pickFormat() {
+  const opts = [['video/mp4;codecs=avc1,opus', 'mp4'], ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'mp4'], ['video/mp4', 'mp4'], ['video/webm;codecs=vp9,opus', 'webm'], ['video/webm;codecs=vp8,opus', 'webm'], ['video/webm', 'webm']];
+  return opts.find(([m]) => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || ['', 'webm'];
+}
+function mixAudio() {
+  const ac = getAC(), dest = ac.createMediaStreamDestination();
+  let n = 0;
+  const add = (s, g) => {
+    if (!s || !s.getAudioTracks().length) return null;
+    const src = ac.createMediaStreamSource(new MediaStream(s.getAudioTracks())), gain = ac.createGain();
+    gain.gain.value = g; src.connect(gain).connect(dest); mixNodes.push(src, gain); n++;
+    return gain;
+  };
+  micGain = add(micStream, muted ? 0 : 1.0); add(screenStream, 0.9);
+  return n ? dest.stream.getAudioTracks() : [];
+}
+function canRecord() { return (demo || !!screenStream) && !(S.mode === 'area' && !S.area) && !selecting; }
+
+async function startRecording() {
+  if (isRecording() || counting || !canRecord()) return;
+  if (S.pip) openPip(); // must start inside the click
+  $('result').hidden = true;
+  counting = true; camOn = true;
+  setControls('countdown');
+  if (!demo) getAC();
+  if (S.countdown) {
+    const cd = $('countdown'); cd.hidden = false;
+    for (let n = 3; n > 0; n--) { cd.textContent = n; await wait(1000); }
+    cd.hidden = true;
+  }
+  if (demo) demoRecording = true, demoPaused = false;
+  else {
+    const fps = Number(S.fps) || 30;
+    let mime; [mime, ext] = pickFormat();
+    const stream = new MediaStream([canvas.captureStream(fps).getVideoTracks()[0], ...mixAudio()]);
+    const base = canvas.width * canvas.height >= 1920 * 1000 ? 6000000 : 3500000;
+    try { mr = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: Math.round(base * (fps >= 60 ? 1.5 : 1)), audioBitsPerSecond: 160000 }); }
+    catch { counting = false; setControls('idle'); closePip(); return setStatus('This browser could not start recording. Use Chrome or Edge.', true); }
+    chunks = [];
+    mr.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    mr.onstop = finish;
+    mr.start(1000);
+  }
+  counting = false;
+  startedAt = performance.now(); pausedAt = 0; pausedTotal = 0;
+  document.body.classList.add('recording');
+  setControls('recording');
+  setStatus(demo ? 'Demo recording… (nothing is saved)' : `Recording (${ext.toUpperCase()})…`);
+  uiTimer = setInterval(tick, 500); tick();
+}
+const isPaused = () => demo ? demoPaused : !!(mr && mr.state === 'paused');
+function togglePause() {
+  if (!isRecording()) return;
+  if (!isPaused()) { if (demo) demoPaused = true; else mr.pause(); pausedAt = performance.now(); setStatus('Paused.'); }
+  else { if (demo) demoPaused = false; else mr.resume(); pausedTotal += performance.now() - pausedAt; pausedAt = 0; setStatus(demo ? 'Demo recording…' : 'Recording…'); }
+  tick();
+}
+function toggleMute() { muted = !muted; if (micGain) micGain.gain.value = muted ? 0 : 1; if (isRecording()) setStatus(muted ? 'Microphone muted.' : 'Microphone on.'); tick(); }
+function toggleCam() { camOn = !camOn; tick(); }
+function stopRecording() {
+  if (demo && demoRecording) { demoRecording = false; return finish(); }
+  if (mr && mr.state !== 'inactive') { setStatus('Finishing the video…'); mr.stop(); }
+}
+function finish() {
+  clearInterval(uiTimer);
+  const ms = elapsed(), dur = fmt(ms);
+  mixNodes.forEach((n) => { try { n.disconnect(); } catch { /* ignore */ } }); mixNodes = []; micGain = null;
+  closePip();
+  document.body.classList.remove('recording');
+  camOn = true;
+  setControls('idle');
+  $('timer').textContent = '00:00';
+  const d = new Date(), p = (n) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+  const vid = $('resultVideo'), dl = $('downloadLink');
+  if (demo) {
+    recordings.unshift({ name: `Demo recording ${stamp}`, dur, size: 0, url: null });
+    $('resultTitle').textContent = 'Demo finished';
+    $('resultMeta').textContent = `Length ${dur}. In demo mode no video is made. Open NextGen-Recorder.html in Chrome or Edge, or install the Windows app, to record for real.`;
+    vid.hidden = true; dl.hidden = true;
+  } else {
+    const blob = new Blob(chunks, { type: mr && mr.mimeType ? mr.mimeType.split(';')[0] : 'video/' + ext });
+    mr = null; chunks = [];
+    const url = URL.createObjectURL(blob), name = `Recording ${stamp}.${ext}`;
+    recordings.unshift({ name, dur, size: blob.size, url });
+    $('resultTitle').textContent = 'Recording ready';
+    $('resultMeta').textContent = `${name} · ${dur} · ${(blob.size / 1048576).toFixed(1)} MB`;
+    vid.src = url; vid.hidden = false;
+    dl.href = url; dl.download = name; dl.hidden = false;
+  }
+  $('result').hidden = false;
+  renderLibrary();
+  setStatus(demo ? 'Demo finished.' : 'Done. Play it below or click Download video.');
+}
+function elapsed() { return startedAt ? (pausedAt || performance.now()) - startedAt - pausedTotal : 0; }
+function fmt(ms) { const t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60, mm = String(m).padStart(2, '0'), ss = String(s).padStart(2, '0'); return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`; }
+function tick() {
+  const txt = fmt(elapsed()), paused = isPaused();
+  $('timer').textContent = txt;
+  $('pauseBtn').textContent = paused ? 'Resume' : 'Pause';
+  $('muteBtn').textContent = muted ? 'Unmute mic' : 'Mute mic';
+  $('muteBtn').classList.toggle('off', muted);
+  $('camBtn').textContent = camOn ? 'Hide camera' : 'Show camera';
+  $('recBadge').textContent = paused ? 'PAUSED' : 'REC';
+  if (pipWin) {
+    const d = pipWin.document;
+    d.getElementById('t').textContent = txt;
+    d.getElementById('p').textContent = paused ? 'Resume' : 'Pause';
+    d.getElementById('m').textContent = muted ? 'Unmute' : 'Mute';
+    d.body.classList.toggle('paused', paused);
+  }
+}
+
+// floating controls (Document Picture-in-Picture, Chrome/Edge 116+)
+async function openPip() {
+  if (!('documentPictureInPicture' in window) || pipWin) return;
+  try {
+    pipWin = await documentPictureInPicture.requestWindow({ width: 360, height: 64 });
+    const d = pipWin.document;
+    d.body.innerHTML = `<style>
+      body{margin:0;background:#1A434E;color:#EAF4F1;font:14px "Segoe UI",system-ui,sans-serif;display:flex;align-items:center;gap:8px;padding:0 10px 0 14px;height:100vh;box-sizing:border-box}
+      .r{width:11px;height:11px;border-radius:50%;background:#FF5A5F}body.paused .r{background:#C3F44D}
+      #t{font-variant-numeric:tabular-nums;font-weight:600;font-size:16px;flex:1}
+      button{border:0;border-radius:999px;padding:8px 12px;font:inherit;font-weight:650;cursor:pointer;background:#21525F;color:#EAF4F1}#s{background:#FF5A5F;color:#fff}
+      </style><span class="r"></span><span id="t">00:00</span><button id="p">Pause</button><button id="m">Mute</button><button id="s">■ Stop</button>`;
+    d.getElementById('p').onclick = togglePause;
+    d.getElementById('m').onclick = toggleMute;
+    d.getElementById('s').onclick = stopRecording;
+    pipWin.addEventListener('pagehide', () => { pipWin = null; });
+  } catch { pipWin = null; }
+}
+function closePip() { if (pipWin) { try { pipWin.close(); } catch { /* ignore */ } pipWin = null; } }
+
+// ---------- library (this tab only) ----------
+function renderLibrary() {
+  $('libCount').textContent = recordings.length ? String(recordings.length) : '';
+  const grid = $('libGrid');
+  grid.innerHTML = '';
+  $('libEmpty').hidden = recordings.length > 0;
+  for (const r of recordings) {
+    const card = document.createElement('article'); card.className = 'lib-card';
+    const th = document.createElement('div'); th.className = 'lib-thumb';
+    if (r.url) { const v = document.createElement('video'); v.src = r.url + '#t=0.5'; v.muted = true; v.preload = 'metadata'; th.appendChild(v); }
+    else th.append('Demo — no file');
+    const du = document.createElement('span'); du.className = 'dur'; du.textContent = r.dur; th.appendChild(du);
+    const body = document.createElement('div'); body.className = 'lib-body';
+    const nm = document.createElement('div'); nm.className = 'lib-name'; nm.textContent = r.name; nm.title = r.name;
+    const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = r.url ? `${(r.size / 1048576).toFixed(1)} MB` : 'Demo mode';
+    body.append(nm, meta);
+    const btns = document.createElement('div'); btns.className = 'lib-btns';
+    if (r.url) {
+      const play = document.createElement('a'); play.className = 'btn-ghost'; play.href = r.url; play.target = '_blank'; play.rel = 'noopener'; play.textContent = 'Play';
+      const dl = document.createElement('a'); dl.className = 'btn-ghost'; dl.href = r.url; dl.download = r.name; dl.textContent = 'Download';
+      btns.append(play, dl);
+    }
+    const trim = document.createElement('span'); trim.className = 'win-only'; trim.textContent = 'Trim / GIF in Windows app';
+    btns.appendChild(trim);
+    card.append(th, body, btns);
+    grid.appendChild(card);
+  }
+}
+
+// ---------- views, theme, tour ----------
+function switchView(v) {
+  document.querySelectorAll('.nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+  $('view-record').hidden = v !== 'record';
+  $('view-library').hidden = v !== 'library';
+}
+function applyTheme() {
+  if (S.theme === 'light' || S.theme === 'dark') document.documentElement.dataset.theme = S.theme;
+  $('themeBtn').textContent = S.theme === 'dark' ? 'Dark' : S.theme === 'light' ? 'Light' : 'Auto theme';
+}
+function cycleTheme() { S.theme = S.theme === '' ? 'light' : S.theme === 'light' ? 'dark' : ''; if (!S.theme) delete document.documentElement.dataset.theme; save(); applyTheme(); }
+
+const TOUR = [
+  ['cardSource', 'Choose what to record', 'Pick a screen, window or tab, or switch to Area and drag over the preview.'],
+  ['cardCamera', 'Set up your camera', 'Drag the bubble on the preview to move it; scroll over it to resize. Blur hides what is behind you.'],
+  ['cardSound', 'Check your sound', 'Speak and watch the green bar. Computer sound works when you share the whole screen or a tab.'],
+  ['recordBtn', 'Start recording', 'Click here or press Alt+Shift+R. A floating window lets you pause, mute and stop.'],
+];
+let tourIdx = 0;
+function startTour() { switchView('record'); tourIdx = 0; $('tour').hidden = false; showTourStep(); }
+function showTourStep() {
+  const [id, title, text] = TOUR[tourIdx];
+  const el = $(id);
+  el.scrollIntoView({ block: 'nearest' });
+  const r = el.getBoundingClientRect(), pad = 6;
+  Object.assign($('tourRing').style, { left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + pad * 2 + 'px', height: r.height + pad * 2 + 'px' });
+  $('tourStep').textContent = `Step ${tourIdx + 1} of ${TOUR.length}`;
+  $('tourTitle').textContent = title; $('tourText').textContent = text;
+  $('tourBack').disabled = tourIdx === 0;
+  $('tourNext').textContent = tourIdx === TOUR.length - 1 ? 'Finish' : 'Next';
+  const tip = $('tourTip'), tw = tip.offsetWidth || 300, th = tip.offsetHeight || 150;
+  let left = r.left - tw - 16, top = Math.max(12, Math.min(innerHeight - th - 12, r.top));
+  if (left < 12) { left = Math.min(innerWidth - tw - 12, Math.max(12, r.left)); top = r.bottom + 14 + th < innerHeight ? r.bottom + 14 : Math.max(12, r.top - th - 14); }
+  tip.style.left = left + 'px'; tip.style.top = top + 'px';
+}
+function endTour() { $('tour').hidden = true; S.tourDone = true; save(); }
+
+// ---------- controls ----------
+function setControls(mode) {
+  const r = $('recordBtn');
+  r.hidden = mode === 'recording';
+  r.disabled = mode !== 'idle' || !canRecord();
+  $('recordLabel').textContent = mode === 'countdown' ? 'Get ready…' : 'Start recording';
+  for (const id of ['pauseBtn', 'muteBtn', 'camBtn', 'stopBtn']) $(id).hidden = mode !== 'recording';
+  $('recBadge').hidden = mode !== 'recording';
+  $('timer').classList.toggle('live', mode === 'recording');
+}
+function updateButtons() { if (!isRecording() && !counting) $('recordBtn').disabled = !canRecord(); }
+function mark(id, attr, val) { document.querySelectorAll(`#${id} button`).forEach((b) => b.classList.toggle('active', String(b.dataset[attr]) === String(val))); }
+
+function bind() {
+  document.querySelectorAll('.nav button').forEach((b) => { b.onclick = () => switchView(b.dataset.view); });
+  $('themeBtn').onclick = cycleTheme;
+  $('pickBtn').onclick = pickSource;
+  $('allowBtn').onclick = allowDevices;
+  $('areaBtn').onclick = startAreaSelect;
+  document.querySelectorAll('#modeSeg button').forEach((b) => { b.onclick = () => setMode(b.dataset.mode); });
+  $('camSelect').onchange = (e) => { S.camId = e.target.value; save(); startCam(); };
+  $('micSelect').onchange = (e) => { S.micId = e.target.value; save(); startMic(); };
+  document.querySelectorAll('#shapeSeg button').forEach((b) => { b.onclick = () => { S.camShape = b.dataset.shape; save(); mark('shapeSeg', 'shape', S.camShape); }; });
+  $('sizeRange').value = Math.round(S.camSize * 100);
+  $('sizeRange').oninput = (e) => setCamSize(Number(e.target.value) / 100);
+  $('blurChk').checked = S.blur;
+  $('blurChk').onchange = (e) => {
+    S.blur = e.target.checked; save();
+    if (!S.blur) $('blurHint').hidden = true;
+    else if (demo) { $('blurHint').hidden = false; $('blurHint').textContent = 'Demo: the sample background is blurred. The real blur runs in the file version and the Windows app.'; }
+    else if (segmenter) { $('blurHint').hidden = false; $('blurHint').textContent = 'Background blur is on. It uses more processing power.'; }
+  };
+  $('sysAudio').checked = S.systemAudio;
+  $('sysAudio').onchange = (e) => { S.systemAudio = e.target.checked; save(); if (screenStream) setStatus('Choose the screen again to apply the computer sound setting.'); };
+  $('countdownChk').checked = S.countdown;
+  $('countdownChk').onchange = (e) => { S.countdown = e.target.checked; save(); };
+  $('pipChk').checked = S.pip;
+  $('pipChk').onchange = (e) => { S.pip = e.target.checked; save(); };
+  if (!('documentPictureInPicture' in window)) { $('pipRow').hidden = true; $('pipHint').hidden = true; }
+  mark('modeSeg', 'mode', S.mode); mark('shapeSeg', 'shape', S.camShape); mark('qualitySeg', 'q', S.quality); mark('fpsSeg', 'fps', S.fps);
+  document.querySelectorAll('#qualitySeg button').forEach((b) => { b.onclick = () => { if (isRecording()) return; S.quality = b.dataset.q; mark('qualitySeg', 'q', S.quality); save(); renderArea(); }; });
+  document.querySelectorAll('#fpsSeg button').forEach((b) => { b.onclick = () => { if (isRecording()) return; S.fps = Number(b.dataset.fps); mark('fpsSeg', 'fps', S.fps); save(); startTicker(); }; });
+  $('recordBtn').onclick = startRecording;
+  $('pauseBtn').onclick = togglePause;
+  $('muteBtn').onclick = toggleMute;
+  $('camBtn').onclick = toggleCam;
+  $('stopBtn').onclick = stopRecording;
+  $('resultClose').onclick = () => { $('result').hidden = true; };
+  $('tourNext').onclick = () => { if (tourIdx < TOUR.length - 1) { tourIdx++; showTourStep(); } else endTour(); };
+  $('tourBack').onclick = () => { if (tourIdx > 0) { tourIdx--; showTourStep(); } };
+  $('tourSkip').onclick = endTour;
+  addEventListener('resize', () => { if (!$('tour').hidden) showTourStep(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { if (!$('tour').hidden) endTour(); if (selecting) { selecting = false; selRect = null; $('previewHint').textContent = 'Drag the camera to move it · scroll over it to resize'; updateButtons(); } return; }
+    if (!e.altKey || !e.shiftKey) return;
+    const k = e.key.toLowerCase();
+    if (k === 'r') { e.preventDefault(); isRecording() ? stopRecording() : startRecording(); }
+    else if (k === 'p') { e.preventDefault(); togglePause(); }
+    else if (k === 'm') { e.preventDefault(); toggleMute(); }
+    else if (k === 'c') { e.preventDefault(); if (isRecording()) toggleCam(); }
+  });
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', () => { if (!demo && !mr && $('allowBtn').hidden) loadDevices(); });
+  }
+}
+
+bind();
+applyTheme();
+setControls('idle');
+renderArea();
+renderLibrary();
+startTicker();
+if (demo) enterDemo();
+else setStatus('Step 1: choose what to record. Step 2: allow the camera and microphone.');
+if (!S.tourDone) setTimeout(startTour, 700);
+</script>
+
+</body>
+</html>

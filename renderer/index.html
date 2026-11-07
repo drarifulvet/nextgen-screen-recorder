@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob: media:; media-src 'self' blob: mediastream: media:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self'">
+  <title>NextGen Screen Recorder</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="../assets/icon.png" alt="" class="logo">
+      <div>
+        <h1>NextGen Screen Recorder</h1>
+        <p>by NextGenIT</p>
+      </div>
+    </div>
+    <nav class="nav" role="tablist" aria-label="Sections">
+      <button class="nav-btn active" data-view="record" role="tab" id="navRecord">Record</button>
+      <button class="nav-btn" data-view="library" role="tab" id="navLibrary">Library <span class="count" id="libCount"></span></button>
+      <button class="nav-btn" data-view="settings" role="tab" id="navSettings">Settings</button>
+    </nav>
+    <div class="status" id="status" role="status">Getting ready…</div>
+  </header>
+
+  <div class="banner info" id="updateBanner" hidden>
+    <span><b id="updTitle">A new version is available.</b> <span id="updText"></span></span>
+    <span class="banner-actions"><button class="btn-solid" id="updGet">Download</button><button class="btn-ghost" id="updLater">Later</button></span>
+  </div>
+  <div class="banner warn" id="recoveryBanner" hidden>
+    <span><b>A recording was interrupted.</b> <span id="recText"></span></span>
+    <span class="banner-actions"><button class="btn-solid" id="recKeep">Recover it</button><button class="btn-ghost" id="recDiscard">Discard</button></span>
+  </div>
+
+  <!-- RECORD -->
+  <main class="view layout" id="view-record">
+    <section class="stage">
+      <div class="preview-wrap" id="previewWrap">
+        <canvas id="preview" width="1280" height="720" aria-label="Live preview of the recording"></canvas>
+        <div class="countdown" id="countdown" hidden>3</div>
+        <div class="preview-hint" id="previewHint">Drag the camera to move it · scroll over it to resize</div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-record" id="recordBtn" disabled title="Start recording (Alt+Shift+R)">
+          <span class="dot"></span><span id="recordLabel">Start recording</span>
+        </button>
+        <div class="timer" id="timer">00:00</div>
+        <button class="btn-ghost" id="pauseBtn" hidden>Pause</button>
+        <button class="btn-ghost" id="muteBtn" hidden>Mute mic</button>
+        <button class="btn-stop" id="stopBtn" hidden>Stop &amp; save</button>
+        <span class="kbd-hint">or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> in any app</span>
+      </div>
+
+      <div class="saved" id="saved" hidden>
+        <img id="savedThumb" alt="">
+        <div class="saved-info">
+          <strong id="savedTitle">Recording saved</strong>
+          <span id="savedMeta"></span>
+        </div>
+        <div class="saved-actions">
+          <button class="btn-ghost" id="savedPlay">Play</button>
+          <button class="btn-ghost" id="savedEdit">Trim / GIF</button>
+          <button class="btn-ghost" id="savedFolder">Show in folder</button>
+          <button class="icon-btn" id="savedClose" aria-label="Close">✕</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="card" id="cardSource">
+        <div class="card-head">
+          <h2>What to record</h2>
+          <button class="icon-btn" id="refreshBtn" title="Refresh list" aria-label="Refresh list">⟳</button>
+        </div>
+        <div class="seg wide3" id="modeSeg" role="tablist">
+          <button data-mode="screen">Screen</button>
+          <button data-mode="window">Window</button>
+          <button data-mode="area">Area</button>
+        </div>
+        <div class="sources" id="sources"></div>
+        <div class="area-row" id="areaRow" hidden>
+          <span id="areaLabel" class="label">No area selected</span>
+          <button class="btn-outline" id="areaBtn">Select area</button>
+        </div>
+      </div>
+
+      <div class="card" id="cardCamera">
+        <h2>Camera</h2>
+        <select id="camSelect" aria-label="Camera"></select>
+        <div class="row">
+          <span class="label">Shape</span>
+          <div class="seg" id="shapeSeg"><button data-shape="circle">Circle</button><button data-shape="rounded">Rounded</button></div>
+        </div>
+        <div class="row">
+          <label class="label" for="sizeRange">Size</label>
+          <input type="range" id="sizeRange" min="12" max="50" step="1">
+        </div>
+        <label class="switch"><input type="checkbox" id="blurChk"><span class="track"><span class="knob"></span></span><span>Blur my background</span></label>
+        <p class="hint" id="blurHint" hidden></p>
+      </div>
+
+      <div class="card" id="cardSound">
+        <h2>Sound</h2>
+        <select id="micSelect" aria-label="Microphone"></select>
+        <div class="meter" aria-hidden="true"><div id="micLevel"></div></div>
+        <label class="switch"><input type="checkbox" id="sysAudio"><span class="track"><span class="knob"></span></span><span>Include computer sound</span></label>
+        <p class="hint" id="sysHint">Records videos, music and app sounds. Use headphones to avoid echo.</p>
+      </div>
+
+      <div class="card" id="cardPresenter">
+        <h2>Presenter tools</h2>
+        <label class="switch"><input type="checkbox" id="haloChk"><span class="track"><span class="knob"></span></span><span>Highlight my mouse pointer</span></label>
+        <label class="switch"><input type="checkbox" id="rippleChk"><span class="track"><span class="knob"></span></span><span>Show a ring when I click</span></label>
+        <p class="hint">Draw on screen while recording with the pen on the control bar, or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>. Works for Screen and Area.</p>
+      </div>
+
+      <div class="card" id="cardQuality">
+        <h2>Quality</h2>
+        <div class="seg wide" id="qualitySeg"><button data-q="720">720p · smaller</button><button data-q="1080">1080p · sharper</button></div>
+        <div class="seg wide" id="fpsSeg"><button data-fps="30">30 fps · standard</button><button data-fps="60">60 fps · smoother</button></div>
+        <label class="switch"><input type="checkbox" id="countdownChk"><span class="track"><span class="knob"></span></span><span>3-second countdown</span></label>
+      </div>
+    </aside>
+  </main>
+
+  <!-- LIBRARY -->
+  <main class="view lib" id="view-library" hidden>
+    <div class="lib-head">
+      <div>
+        <h2>Your recordings</h2>
+        <p class="hint" id="libFolder"></p>
+      </div>
+      <div class="lib-actions">
+        <button class="btn-ghost" id="libOpenFolder">Open folder</button>
+        <button class="btn-ghost" id="libRefresh">Refresh</button>
+      </div>
+    </div>
+    <div class="lib-grid" id="libGrid"></div>
+    <div class="empty-state" id="libEmpty" hidden>
+      <strong>No recordings yet</strong>
+      <span>Press Start recording on the Record tab. Your videos appear here with tools to trim, make a GIF or a smaller copy.</span>
+    </div>
+  </main>
+
+  <!-- SETTINGS -->
+  <main class="view settings" id="view-settings" hidden>
+    <section class="set-card">
+      <h2>Saving</h2>
+      <div class="set-row">
+        <div><strong>Save recordings to</strong><span class="hint" id="saveDirLabel"></span></div>
+        <button class="btn-ghost" id="saveDirBtn">Change…</button>
+      </div>
+      <label class="switch"><input type="checkbox" id="askSaveChk"><span class="track"><span class="knob"></span></span><span>Ask where to save each recording</span></label>
+      <label class="switch"><input type="checkbox" id="standardChk"><span class="track"><span class="knob"></span></span><span>Save as standard MP4 (plays in every app and phone)</span></label>
+    </section>
+    <section class="set-card">
+      <h2>Appearance</h2>
+      <div class="seg wide3" id="themeSeg"><button data-theme="system">Match Windows</button><button data-theme="light">Light</button><button data-theme="dark">Dark</button></div>
+    </section>
+    <section class="set-card">
+      <h2>Keyboard shortcuts</h2>
+      <p class="hint">These work in any app, even when NextGen Recorder is minimised.</p>
+      <table class="keys" id="keysTable"></table>
+    </section>
+    <section class="set-card">
+      <h2>Updates</h2>
+      <div class="set-row">
+        <div><strong>Version <span id="verLabel"></span></strong><span class="hint" id="updStatus">Not checked yet.</span></div>
+        <button class="btn-ghost" id="checkBtn">Check now</button>
+      </div>
+      <label class="switch"><input type="checkbox" id="autoUpdChk"><span class="track"><span class="knob"></span></span><span>Check for new versions when the app starts</span></label>
+    </section>
+    <section class="set-card">
+      <h2>Help</h2>
+      <div class="set-row">
+        <div><strong>Quick tour</strong><span class="hint">A 5-step walk-through of the main screen.</span></div>
+        <button class="btn-ghost" id="tourBtn">Show tour</button>
+      </div>
+      <div class="set-row">
+        <div><strong>Release notes and downloads</strong><span class="hint">github.com/drarifulvet/nextgen-screen-recorder</span></div>
+        <button class="btn-ghost" id="ghBtn">Open on GitHub</button>
+      </div>
+      <p class="hint">NextGen Screen Recorder is free, with no time limits and no watermark. Your videos stay on this computer. © 2026 NextGen IT.</p>
+    </section>
+  </main>
+
+  <!-- EDITOR -->
+  <div class="modal" id="editor" hidden role="dialog" aria-modal="true" aria-labelledby="edTitle">
+    <div class="modal-card wide">
+      <div class="modal-head"><h2 id="edTitle">Edit recording</h2><button class="icon-btn" id="edClose" aria-label="Close">✕</button></div>
+      <video id="edVideo" controls preload="metadata"></video>
+      <div class="trim">
+        <div class="trim-track" id="trimTrack">
+          <div class="trim-sel" id="trimSel"></div>
+          <input type="range" id="trimStart" min="0" step="0.1" aria-label="Start">
+          <input type="range" id="trimEnd" min="0" step="0.1" aria-label="End">
+        </div>
+        <div class="trim-labels">
+          <span>Start <b id="tsLabel">0:00.0</b> <button class="link" id="setStart">use current time</button></span>
+          <span>Length <b id="lenLabel">0:00.0</b></span>
+          <span>End <b id="teLabel">0:00.0</b> <button class="link" id="setEnd">use current time</button></span>
+        </div>
+      </div>
+      <div class="ed-actions">
+        <button class="btn-ghost" id="edPreview">▶ Play selection</button>
+        <span class="spacer"></span>
+        <button class="btn-solid" id="edTrim">Save trimmed copy</button>
+        <button class="btn-ghost" id="edGif">Export GIF</button>
+        <button class="btn-ghost" id="edSmall">Make smaller copy</button>
+      </div>
+      <p class="hint" id="edNote">Your original is never changed: each action saves a new file next to it.</p>
+      <div class="progress" id="edProgress" hidden><div id="edBar"></div><span id="edPct">0%</span><button class="link" id="edCancel">Cancel</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="renameDlg" hidden role="dialog" aria-modal="true" aria-labelledby="rnTitle">
+    <div class="modal-card">
+      <h2 id="rnTitle">Rename recording</h2>
+      <input type="text" id="rnInput" aria-label="New name">
+      <p class="hint error" id="rnErr" hidden></p>
+      <div class="ed-actions"><span class="spacer"></span><button class="btn-ghost" id="rnCancel">Cancel</button><button class="btn-solid" id="rnSave">Rename</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="confirmDlg" hidden role="dialog" aria-modal="true" aria-labelledby="cfTitle">
+    <div class="modal-card">
+      <h2 id="cfTitle">Move to Recycle Bin?</h2>
+      <p id="cfText"></p>
+      <div class="ed-actions"><span class="spacer"></span><button class="btn-ghost" id="cfCancel">Cancel</button><button class="btn-danger" id="cfOk">Move to Recycle Bin</button></div>
+    </div>
+  </div>
+
+  <div class="tour" id="tour" hidden>
+    <div class="tour-ring" id="tourRing"></div>
+    <div class="tour-tip" id="tourTip" role="dialog" aria-live="polite">
+      <span class="tour-step" id="tourStep"></span>
+      <strong id="tourTitle"></strong>
+      <p id="tourText"></p>
+      <div class="tour-actions"><button class="link" id="tourSkip">Skip tour</button><span class="spacer"></span><button class="btn-ghost" id="tourBack">Back</button><button class="btn-solid" id="tourNext">Next</button></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>Recording controls</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    body { font: 14px "Segoe UI", system-ui, sans-serif; color: #EAF4F1; user-select: none; }
+    .wrap { margin: 4px; background: #1A434E; border: 1px solid #2C6372; border-radius: 26px; box-shadow: 0 4px 14px rgba(0,0,0,.35); overflow: hidden; }
+    .row { height: 52px; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 14px; }
+    .row.main { -webkit-app-region: drag; }
+    .tools { border-top: 1px solid #2C6372; height: 48px; padding: 0 10px; }
+    .rec { width: 11px; height: 11px; border-radius: 50%; background: #FF5A5F; animation: blink 1.2s infinite; flex-shrink: 0; }
+    .paused .rec { background: #C3F44D; animation: none; }
+    @keyframes blink { 50% { opacity: .25; } }
+    @media (prefers-reduced-motion: reduce) { .rec { animation: none; } }
+    .time { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; min-width: 58px; }
+    .grip { color: #A8C3C2; font-size: 15px; letter-spacing: -3px; flex: 1; cursor: move; }
+    button {
+      -webkit-app-region: no-drag; border: 0; border-radius: 999px; height: 36px; min-width: 36px; padding: 0 12px;
+      font: inherit; font-weight: 650; cursor: pointer; background: #21525F; color: #EAF4F1;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    button:hover { background: #2C6372; }
+    button:focus-visible { outline: 2px solid #C3F44D; outline-offset: 1px; }
+    button.icon { padding: 0; width: 36px; }
+    button.off { background: #4A2328; color: #FFB4B6; }
+    button.on { background: #C3F44D; color: #12313A; }
+    #stop { background: #FF5A5F; color: #fff; }
+    svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .sw { width: 22px; height: 22px; min-width: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
+    .sw.sel { border-color: #fff; }
+    .sep { width: 1px; height: 24px; background: #2C6372; margin: 0 4px; }
+    .tool.sel { background: #C3F44D; color: #12313A; }
+    #toast { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); background: #12313A; color: #EAF4F1; font-size: 12px; padding: 3px 10px; border-radius: 999px; }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="wrap">
+    <div class="row main">
+      <span class="rec"></span>
+      <span class="time" id="time">00:00</span>
+      <span class="grip" title="Drag to move">⋮⋮</span>
+      <button id="pause" title="Pause or resume (Alt+Shift+P)">Pause</button>
+      <button class="icon" id="mic" title="Mute or unmute microphone (Alt+Shift+M)" aria-label="Microphone">
+        <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path id="micSlash" d="M4 4l16 16" style="display:none"/></svg>
+      </button>
+      <button class="icon" id="cam" title="Show or hide camera (Alt+Shift+C)" aria-label="Camera">
+        <svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3"/><path id="camSlash" d="M3 4l17 17" style="display:none"/></svg>
+      </button>
+      <button class="icon" id="draw" title="Draw on screen (Alt+Shift+D)" aria-label="Draw on screen">
+        <svg viewBox="0 0 24 24"><path d="M4 20l4-1 10-10-3-3L5 16l-1 4z"/><path d="M14 7l3 3"/></svg>
+      </button>
+      <button id="stop" title="Stop and save (Alt+Shift+R)">■ Stop</button>
+    </div>
+    <div class="row tools" id="tools" hidden>
+      <button class="icon tool sel" data-tool="pen" title="Pen" aria-label="Pen"><svg viewBox="0 0 24 24"><path d="M4 20l4-1 10-10-3-3L5 16l-1 4z"/></svg></button>
+      <button class="icon tool" data-tool="highlighter" title="Highlighter" aria-label="Highlighter"><svg viewBox="0 0 24 24"><path d="M9 15l-4 4h5l2-2"/><path d="M8 14l7-9 4 4-9 7z"/></svg></button>
+      <button class="icon tool" data-tool="arrow" title="Arrow" aria-label="Arrow"><svg viewBox="0 0 24 24"><path d="M5 19L19 5M10 5h9v9"/></svg></button>
+      <button class="icon tool" data-tool="box" title="Box" aria-label="Box"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
+      <span class="sep"></span>
+      <button class="sw sel" data-color="#FF3B30" style="background:#FF3B30" aria-label="Red"></button>
+      <button class="sw" data-color="#FFD60A" style="background:#FFD60A" aria-label="Yellow"></button>
+      <button class="sw" data-color="#C3F44D" style="background:#C3F44D" aria-label="Lime"></button>
+      <button class="sw" data-color="#0A84FF" style="background:#0A84FF" aria-label="Blue"></button>
+      <span class="sep"></span>
+      <button id="undo" title="Undo (Ctrl+Z)">Undo</button>
+      <button id="clear" title="Clear all drawings">Clear</button>
+      <button id="done" class="on" title="Stop drawing (Esc)">Done</button>
+    </div>
+  </div>
+  <div id="toast" hidden></div>
+  <script src="controlbar.js"></script>
+</body>
+</html>

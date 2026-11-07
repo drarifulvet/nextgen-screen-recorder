@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>Select area</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; cursor: crosshair; user-select: none; font: 14px "Segoe UI", system-ui, sans-serif; }
+    body { background: rgba(10, 30, 35, .45); }
+    body.has-sel { background: transparent; }
+    #sel { position: fixed; display: none; border: 2px solid #C3F44D; box-shadow: 0 0 0 99999px rgba(10, 30, 35, .45); }
+    #size { position: absolute; left: 0; top: -30px; background: #1A434E; color: #EAF4F1; padding: 3px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #help { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); background: #1A434E; color: #EAF4F1; padding: 10px 18px; border-radius: 999px; box-shadow: 0 4px 16px rgba(0,0,0,.35); white-space: nowrap; }
+    #help b { color: #C3F44D; }
+    #actions { position: fixed; display: none; gap: 8px; }
+    button { font: inherit; font-weight: 650; border: 0; border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+    #ok { background: #C3F44D; color: #12313A; }
+    #redo, #cancel { background: #1A434E; color: #EAF4F1; }
+  </style>
+</head>
+<body>
+  <div id="help">Drag to select the area to record · <b>Enter</b> to confirm · <b>Esc</b> to cancel</div>
+  <div id="sel"><span id="size"></span></div>
+  <div id="actions">
+    <button id="ok">Record this area</button>
+    <button id="redo">Redraw</button>
+    <button id="cancel">Cancel</button>
+  </div>
+  <script src="region.js"></script>
+</body>
+</html>

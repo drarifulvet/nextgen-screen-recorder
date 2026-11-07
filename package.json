@@ -1,0 +1,87 @@
+{
+  "name": "nextgen-screen-recorder",
+  "productName": "NextGen Screen Recorder",
+  "version": "0.2.0",
+  "description": "Free Windows screen recorder: screen, camera bubble, voice and computer sound, with presenter tools, trimming and GIF export.",
+  "main": "main.js",
+  "author": {
+    "name": "NextGen IT",
+    "email": "drariful.vet@gmail.com"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "prepare": "node scripts/prepare.js",
+    "predist": "node scripts/prepare.js",
+    "dist": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "pe-library": "^2.0.1",
+    "resedit": "^3.1.0",
+    "@mediapipe/tasks-vision": "^1.2.2"
+  },
+  "build": {
+    "appId": "com.nextgenit.screenrecorder",
+    "productName": "NextGen Screen Recorder",
+    "copyright": "© 2026 NextGen IT",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**",
+      "assets/**",
+      "package.json",
+      "node_modules/uiohook-napi/**",
+      "node_modules/node-gyp-build/**"
+    ],
+    "afterPack": "./scripts/afterPack.js",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "extraResources": [
+        {
+          "from": "vendor/ffmpeg.exe",
+          "to": "ffmpeg.exe"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NextGen Screen Recorder",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "NextGen-Screen-Recorder-Setup-${version}.exe"
+    },
+    "publish": null,
+    "asarUnpack": [
+      "node_modules/uiohook-napi/**"
+    ],
+    "npmRebuild": false
+  },
+  "dependencies": {
+    "uiohook-napi": "^1.5.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/drarifulvet/nextgen-screen-recorder.git"
+  },
+  "homepage": "https://github.com/drarifulvet/nextgen-screen-recorder"
+}
