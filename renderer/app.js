@@ -737,6 +737,16 @@ function renderSettings() {
     tr.innerHTML = `<td>${keys}</td><td>${k.label}${k.ok ? '' : ' <span class="bad">(in use by another app)</span>'}</td>`;
     t.appendChild(tr);
   }
+  if (info.drawShortcuts && info.drawShortcuts.length) {
+    const head = document.createElement('tr');
+    head.innerHTML = '<td colspan="2" class="keys-sub">While drawing</td>';
+    t.appendChild(head);
+    for (const k of info.drawShortcuts) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${k.acc.split('+').map((x) => `<kbd>${x}</kbd>`).join('+')}</td><td>${k.label}</td>`;
+      t.appendChild(tr);
+    }
+  }
 }
 function applyTheme(dark) { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; }
 

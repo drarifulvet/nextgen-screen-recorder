@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.1 — 7 November 2026
+
+### Fixed
+- Control bar buttons (colours, tools, Undo, Clear, Done) could not be clicked while drawing, because the drawing layer covered the bar on Windows
+- Slides could not be changed while drawing: arrow keys, Page Up/Down and Space now always reach PowerPoint (or any other app), even with the pen on
+- Clicking the control bar no longer takes the keyboard away from your presentation
+
+### Added
+- **Mouse mode** (cursor button on the bar, or Alt+Shift+F): drawings stay on screen while your clicks go to the slides; pick any pen tool or colour to draw again
+- Drawing shortcuts: Alt+Shift+1/2/3/4 for red/yellow/lime/blue, Alt+Shift+Z undo, Alt+Shift+X clear
+- The bar shows which colour and tool are active, also when changed by shortcut, with a short confirmation message
+
 ## 0.2.0 — 7 November 2026
 
 ### Added

@@ -154,11 +154,12 @@ function displayForSelection() {
 function createBar() {
   if (barWin) return;
   const b = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  const w = 560; const h = 62;
+  const w = 610; const h = 62;
   barWin = new BrowserWindow({
     width: w, height: h, x: Math.round(b.x + (b.width - w) / 2), y: b.y + 14,
     frame: false, resizable: false, alwaysOnTop: true, skipTaskbar: true, transparent: true,
-    hasShadow: false, focusable: true, webPreferences: webPrefs(),
+    // focusable: false = clicking the bar never takes the keyboard away from PowerPoint or other apps
+    hasShadow: false, focusable: false, webPreferences: webPrefs(),
   });
   barWin.setAlwaysOnTop(true, 'screen-saver');
   barWin.setContentProtection(true); // excluded from the recording on Windows 10 2004+ / 11
@@ -189,34 +190,108 @@ function createDrawOverlay() {
   drawWin = new BrowserWindow({
     x: d.x, y: d.y, width: d.width, height: d.height,
     frame: false, transparent: true, resizable: false, movable: false, alwaysOnTop: true,
-    skipTaskbar: true, hasShadow: false, show: false, focusable: true, webPreferences: webPrefs(),
+    // focusable: false = the pen takes the mouse but never the keyboard,
+    // so arrow keys / Page Down keep changing slides while drawing
+    skipTaskbar: true, hasShadow: false, show: false, focusable: false, webPreferences: webPrefs(),
   });
   drawWin.setAlwaysOnTop(true, 'pop-up-menu');
   drawWin.loadURL(page('draw.html'));
   drawWin.on('closed', () => { drawWin = null; });
 }
 
+// Windows ignores always-on-top "levels": the most recently shown top-most window wins.
+// While drawing, keep lifting the control bar above the drawing layer so its buttons stay clickable.
+let barLiftTimer = null;
+function liftBar() {
+  if (!barWin || barWin.isDestroyed()) return;
+  barWin.setAlwaysOnTop(true, 'screen-saver');
+  barWin.moveTop();
+}
+function startBarLift() { stopBarLift(); liftBar(); barLiftTimer = setInterval(liftBar, 400); }
+function stopBarLift() { if (barLiftTimer) clearInterval(barLiftTimer); barLiftTimer = null; }
+
+const COLORS = [['#FF3B30', 'Red'], ['#FFD60A', 'Yellow'], ['#C3F44D', 'Lime'], ['#0A84FF', 'Blue']];
+const TOOL_NAMES = { pen: 'Pen', highlighter: 'Highlighter', arrow: 'Arrow', box: 'Box' };
+let drawState = { tool: 'pen', color: COLORS[0][0], mouse: false };
+
+function sendDraw(msg) { if (drawWin && !drawWin.isDestroyed()) drawWin.webContents.send('draw', msg); }
+
 function setDrawing(on) {
   if (on && selected.kind === 'window') {
-    toBar('toast', 'Drawing works when recording a whole screen or an area.');
+    toBar('toast', 'Drawing works for Screen and Area recordings');
     return;
   }
   recState.drawing = on;
   if (on) {
+    drawState.mouse = false;
     createDrawOverlay();
     const wc = drawWin.webContents;
     const reveal = () => {
       if (!drawWin) return;
-      drawWin.show();
-      drawWin.focus();
-      wc.send('draw', { cmd: 'show' });
+      drawWin.setIgnoreMouseEvents(false);
+      drawWin.showInactive();
+      sendDraw({ cmd: 'show' });
+      sendDraw({ cmd: 'tool', tool: drawState.tool, color: drawState.color, mouse: false });
+      startBarLift();
     };
     if (wc.isLoading()) wc.once('did-finish-load', reveal); else reveal();
-  } else if (drawWin) {
-    drawWin.webContents.send('draw', { cmd: 'clear' });
-    drawWin.hide();
+    registerDrawShortcuts();
+  } else {
+    unregisterDrawShortcuts();
+    stopBarLift();
+    drawState.mouse = false;
+    if (drawWin) {
+      sendDraw({ cmd: 'clear' });
+      drawWin.setIgnoreMouseEvents(false);
+      drawWin.hide();
+    }
   }
   pushState();
+}
+
+function setDrawTool(tool) {
+  if (!recState.drawing) return;
+  drawState.tool = tool;
+  if (drawState.mouse) setMouseMode(false, true);
+  sendDraw({ cmd: 'tool', tool });
+  pushState();
+}
+function setDrawColor(color) {
+  if (!recState.drawing) return;
+  drawState.color = color;
+  if (drawState.mouse) setMouseMode(false, true);
+  sendDraw({ cmd: 'tool', color });
+  pushState();
+  const name = (COLORS.find((c) => c[0] === color) || [])[1];
+  if (name) toBar('toast', `${name} ${TOOL_NAMES[drawState.tool].toLowerCase()}`);
+}
+// Mouse mode: drawings stay on screen but clicks pass through to the app underneath.
+function setMouseMode(on, quiet) {
+  if (!recState.drawing || !drawWin) return;
+  drawState.mouse = on;
+  drawWin.setIgnoreMouseEvents(on, { forward: true });
+  sendDraw({ cmd: 'mouse', on });
+  if (!quiet) toBar('toast', on ? 'Mouse mode: clicks go to your slides' : 'Pen ready');
+  liftBar();
+  pushState();
+}
+
+const DRAW_SHORTCUTS = [
+  ['Alt+Shift+1', () => setDrawColor(COLORS[0][0]), 'Red pen'],
+  ['Alt+Shift+2', () => setDrawColor(COLORS[1][0]), 'Yellow pen'],
+  ['Alt+Shift+3', () => setDrawColor(COLORS[2][0]), 'Lime pen'],
+  ['Alt+Shift+4', () => setDrawColor(COLORS[3][0]), 'Blue pen'],
+  ['Alt+Shift+Z', () => sendDraw({ cmd: 'undo' }), 'Undo last drawing'],
+  ['Alt+Shift+X', () => sendDraw({ cmd: 'clear' }), 'Clear all drawings'],
+  ['Alt+Shift+F', () => setMouseMode(!drawState.mouse), 'Switch between pen and mouse'],
+];
+function registerDrawShortcuts() {
+  for (const [acc, fn] of DRAW_SHORTCUTS) {
+    try { if (!globalShortcut.isRegistered(acc)) globalShortcut.register(acc, fn); } catch { /* in use elsewhere */ }
+  }
+}
+function unregisterDrawShortcuts() {
+  for (const [acc] of DRAW_SHORTCUTS) { try { globalShortcut.unregister(acc); } catch { /* ignore */ } }
 }
 
 // ---------- cursor + clicks (for the cursor halo and click ripples) ----------
@@ -292,7 +367,7 @@ function showMain() {
   mainWin.focus();
 }
 function pushState() {
-  toBar('state', recState);
+  toBar('state', { ...recState, tool: drawState.tool, color: drawState.color, mouse: drawState.mouse });
   toMain('rec-state', recState);
   refreshTray();
 }
@@ -392,6 +467,7 @@ ipcMain.handle('init', () => ({
   version: APP_VERSION,
   platform: process.platform,
   shortcuts: SHORTCUTS.map(([acc, cmd, label]) => ({ acc, cmd, label, ok: shortcutStatus[acc] !== false })),
+  drawShortcuts: DRAW_SHORTCUTS.map(([acc, , label]) => ({ acc, label })),
   hasClickHook: (() => { try { require.resolve('uiohook-napi'); return true; } catch { return false; } })(),
   dark: nativeTheme.shouldUseDarkColors,
   library: library.map(publicEntry),
@@ -714,7 +790,10 @@ ipcMain.handle('recording-finished', () => {
   if (barWin && !barWin.isDestroyed()) barWin.destroy();
   barWin = null;
   closeAreaFrame();
-  if (drawWin) { drawWin.webContents.send('draw', { cmd: 'clear' }); drawWin.hide(); }
+  unregisterDrawShortcuts();
+  stopBarLift();
+  drawState.mouse = false;
+  if (drawWin) { sendDraw({ cmd: 'clear' }); drawWin.setIgnoreMouseEvents(false); drawWin.hide(); }
   pushState();
   return true;
 });
@@ -724,10 +803,15 @@ ipcMain.on('bar-time', (e, t) => toBar('time', t));
 // control bar -> main window / draw overlay
 ipcMain.on('bar-command', (e, cmd) => {
   if (cmd === 'draw') return setDrawing(!recState.drawing);
-  if (cmd && cmd.tool !== undefined) { if (drawWin) drawWin.webContents.send('draw', { cmd: 'tool', ...cmd }); return; }
-  if (cmd === 'undo' || cmd === 'clear') { if (drawWin) drawWin.webContents.send('draw', { cmd }); return; }
+  if (cmd && typeof cmd === 'object') {
+    if (cmd.tool) setDrawTool(cmd.tool);
+    if (cmd.color) setDrawColor(cmd.color);
+    return;
+  }
+  if (cmd === 'mouse') return setMouseMode(!drawState.mouse);
+  if (cmd === 'undo' || cmd === 'clear') { sendDraw({ cmd }); return; }
   if (cmd === 'bar-expand' || cmd === 'bar-collapse') {
-    if (barWin) { const b = barWin.getBounds(); barWin.setBounds({ ...b, height: cmd === 'bar-expand' ? 112 : 62 }); }
+    if (barWin) { const b = barWin.getBounds(); barWin.setBounds({ ...b, height: cmd === 'bar-expand' ? 112 : 62 }); liftBar(); }
     return;
   }
   toMain('command', cmd);
@@ -764,3 +848,6 @@ ipcMain.handle('releases-page', () => { shell.openExternal(RELEASES_URL); return
 function moveFile(from, to) {
   try { fs.renameSync(from, to); } catch { fs.copyFileSync(from, to); fs.unlinkSync(from); }
 }
+
+// For automated tests only.
+module.exports = { _test: { runCommand, setDrawing, setDrawTool, setDrawColor, setMouseMode, getDrawState: () => drawState, wins: () => ({ barWin, drawWin }) } };

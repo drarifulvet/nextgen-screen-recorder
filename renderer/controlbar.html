@@ -16,7 +16,8 @@
     @keyframes blink { 50% { opacity: .25; } }
     @media (prefers-reduced-motion: reduce) { .rec { animation: none; } }
     .time { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; min-width: 58px; }
-    .grip { color: #A8C3C2; font-size: 15px; letter-spacing: -3px; flex: 1; cursor: move; }
+    .grip { color: #A8C3C2; font-size: 15px; letter-spacing: -3px; flex: 1; cursor: move; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .grip.msg { font-size: 12px; letter-spacing: 0; color: #C3F44D; font-weight: 600; }
     button {
       -webkit-app-region: no-drag; border: 0; border-radius: 999px; height: 36px; min-width: 36px; padding: 0 12px;
       font: inherit; font-weight: 650; cursor: pointer; background: #21525F; color: #EAF4F1;
@@ -33,7 +34,6 @@
     .sw.sel { border-color: #fff; }
     .sep { width: 1px; height: 24px; background: #2C6372; margin: 0 4px; }
     .tool.sel { background: #C3F44D; color: #12313A; }
-    #toast { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); background: #12313A; color: #EAF4F1; font-size: 12px; padding: 3px 10px; border-radius: 999px; }
   </style>
 </head>
 <body>
@@ -41,7 +41,7 @@
     <div class="row main">
       <span class="rec"></span>
       <span class="time" id="time">00:00</span>
-      <span class="grip" title="Drag to move">⋮⋮</span>
+      <span class="grip" id="grip" title="Drag to move">⋮⋮</span>
       <button id="pause" title="Pause or resume (Alt+Shift+P)">Pause</button>
       <button class="icon" id="mic" title="Mute or unmute microphone (Alt+Shift+M)" aria-label="Microphone">
         <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path id="micSlash" d="M4 4l16 16" style="display:none"/></svg>
@@ -59,18 +59,18 @@
       <button class="icon tool" data-tool="highlighter" title="Highlighter" aria-label="Highlighter"><svg viewBox="0 0 24 24"><path d="M9 15l-4 4h5l2-2"/><path d="M8 14l7-9 4 4-9 7z"/></svg></button>
       <button class="icon tool" data-tool="arrow" title="Arrow" aria-label="Arrow"><svg viewBox="0 0 24 24"><path d="M5 19L19 5M10 5h9v9"/></svg></button>
       <button class="icon tool" data-tool="box" title="Box" aria-label="Box"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
+      <button class="icon" id="mouse" title="Mouse: keep drawings, click your slides (Alt+Shift+F)" aria-label="Mouse mode"><svg viewBox="0 0 24 24"><path d="M6 3l12 9-5.5 1.2L15 19l-2.4 1.1-2.6-5.9L6 18z"/></svg></button>
       <span class="sep"></span>
-      <button class="sw sel" data-color="#FF3B30" style="background:#FF3B30" aria-label="Red"></button>
-      <button class="sw" data-color="#FFD60A" style="background:#FFD60A" aria-label="Yellow"></button>
-      <button class="sw" data-color="#C3F44D" style="background:#C3F44D" aria-label="Lime"></button>
-      <button class="sw" data-color="#0A84FF" style="background:#0A84FF" aria-label="Blue"></button>
+      <button class="sw sel" data-color="#FF3B30" style="background:#FF3B30" title="Red (Alt+Shift+1)" aria-label="Red"></button>
+      <button class="sw" data-color="#FFD60A" style="background:#FFD60A" title="Yellow (Alt+Shift+2)" aria-label="Yellow"></button>
+      <button class="sw" data-color="#C3F44D" style="background:#C3F44D" title="Lime (Alt+Shift+3)" aria-label="Lime"></button>
+      <button class="sw" data-color="#0A84FF" style="background:#0A84FF" title="Blue (Alt+Shift+4)" aria-label="Blue"></button>
       <span class="sep"></span>
-      <button id="undo" title="Undo (Ctrl+Z)">Undo</button>
-      <button id="clear" title="Clear all drawings">Clear</button>
-      <button id="done" class="on" title="Stop drawing (Esc)">Done</button>
+      <button id="undo" title="Undo (Alt+Shift+Z)">Undo</button>
+      <button id="clear" title="Clear all drawings (Alt+Shift+X)">Clear</button>
+      <button id="done" class="on" title="Stop drawing and clear (Alt+Shift+D)">Done</button>
     </div>
   </div>
-  <div id="toast" hidden></div>
   <script src="controlbar.js"></script>
 </body>
 </html>

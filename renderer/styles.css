@@ -177,6 +177,7 @@ body.recording .panel { pointer-events: none; opacity: .5; }
 .keys td { padding: 6px 0; border-top: 1px solid var(--line); }
 .keys td:first-child { white-space: nowrap; padding-right: 16px; }
 .keys .bad { color: var(--red); font-size: 12px; }
+.keys .keys-sub { padding-top: 14px; font-weight: 650; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
 
 /* modals */
 .modal { position: fixed; inset: 0; background: rgba(8, 22, 26, .55); display: grid; place-items: center; z-index: 50; }

@@ -86,13 +86,12 @@ c.addEventListener('pointerup', () => {
   current = null;
   render();
 });
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') window.recorder.drawExit();
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { shapes.pop(); render(); }
-});
+// This window never takes the keyboard (so slide keys reach PowerPoint);
+// undo, clear and colours come from the control bar or Alt+Shift shortcuts.
 
 window.recorder.onDraw((m) => {
   if (m.cmd === 'tool') { if (m.tool) tool = m.tool; if (m.color) color = m.color; }
+  else if (m.cmd === 'mouse') { current = null; document.body.style.cursor = m.on ? 'default' : 'crosshair'; render(); }
   else if (m.cmd === 'undo') { shapes.pop(); render(); }
   else if (m.cmd === 'clear') { shapes = []; current = null; render(); }
   else if (m.cmd === 'show') { resize(); }

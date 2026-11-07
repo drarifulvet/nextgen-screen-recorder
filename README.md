@@ -4,7 +4,7 @@ A free Windows screen recorder. It records your **screen**, a **camera bubble**,
 
 **Free, no time limit, no watermark. Your videos stay on your computer.**
 
-Version 0.2.0 · Windows 10 (version 2004 or newer) and Windows 11, 64-bit · 7 November 2026
+Version 0.2.1 · Windows 10 (version 2004 or newer) and Windows 11, 64-bit · 7 November 2026
 
 ---
 
@@ -42,6 +42,18 @@ Version 0.2.0 · Windows 10 (version 2004 or newer) and Windows 11, 64-bit · 7 
 | Alt+Shift+C | Show or hide camera |
 | Alt+Shift+D | Draw on screen |
 
+While drawing (pen on):
+
+| Keys | Action |
+|---|---|
+| Alt+Shift+1 / 2 / 3 / 4 | Red / yellow / lime / blue pen |
+| Alt+Shift+Z | Undo last drawing |
+| Alt+Shift+X | Clear all drawings |
+| Alt+Shift+F | Mouse mode: keep drawings, click your slides (press again to draw) |
+| Alt+Shift+D | Pen off (drawings are cleared) |
+
+Arrow keys, Page Up/Down and Space keep changing your slides while the pen is on.
+
 ---
 
 ## For users
@@ -49,7 +61,7 @@ Version 0.2.0 · Windows 10 (version 2004 or newer) and Windows 11, 64-bit · 7 
 ### Install
 1. Download the latest `.zip` from the [Releases page](https://github.com/drarifulvet/nextgen-screen-recorder/releases).
 2. Right-click the zip and choose **Extract All… → Extract**.
-3. Double-click **NextGen-Screen-Recorder-Setup-0.2.0.exe**.
+3. Double-click **NextGen-Screen-Recorder-Setup-0.2.1.exe**.
 4. If Windows shows **"Windows protected your PC"**, click **More info**, then **Run anyway**. (The app is new and not yet code-signed.)
 5. Click **Next**, then **Install**, then open the app from the desktop shortcut.
 
