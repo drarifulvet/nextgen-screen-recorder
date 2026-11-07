@@ -4,7 +4,7 @@ A free Windows screen recorder. It records your **screen**, a **camera bubble**,
 
 **Free, no time limit, no watermark. Your videos stay on your computer.**
 
-Version 0.2.1 · Windows 10 (version 2004 or newer) and Windows 11, 64-bit · 7 November 2026
+Version 0.2.2 · Windows 10 (version 2004 or newer) and Windows 11, 64-bit · 7 November 2026
 
 ---
 
@@ -61,7 +61,7 @@ Arrow keys, Page Up/Down and Space keep changing your slides while the pen is on
 ### Install
 1. Download the latest `.zip` from the [Releases page](https://github.com/drarifulvet/nextgen-screen-recorder/releases).
 2. Right-click the zip and choose **Extract All… → Extract**.
-3. Double-click **NextGen-Screen-Recorder-Setup-0.2.1.exe**.
+3. Double-click **NextGen-Screen-Recorder-Setup-0.2.2.exe**.
 4. If Windows shows **"Windows protected your PC"**, click **More info**, then **Run anyway**. (The app is new and not yet code-signed.)
 5. Click **Next**, then **Install**, then open the app from the desktop shortcut.
 

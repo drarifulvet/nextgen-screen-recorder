@@ -5,33 +5,37 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
   <title>Recording controls</title>
   <style>
-    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    /* The window is sized to fit .wrap (measured in controlbar.js), so nothing is clipped at any
+       Windows display scale or text size. Extra space below is for the shadow. */
+    [hidden] { display: none !important; }
+    html, body { margin: 0; background: transparent; overflow: hidden; }
     body { font: 14px "Segoe UI", system-ui, sans-serif; color: #EAF4F1; user-select: none; }
-    .wrap { margin: 4px; background: #1A434E; border: 1px solid #2C6372; border-radius: 26px; box-shadow: 0 4px 14px rgba(0,0,0,.35); overflow: hidden; }
-    .row { height: 52px; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 14px; }
+    .wrap { display: inline-flex; flex-direction: column; margin: 4px 6px 12px; background: #1A434E; border: 1px solid #2C6372; border-radius: 26px; box-shadow: 0 4px 12px rgba(0,0,0,.35); overflow: hidden; }
+    .row { min-height: 52px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 14px; white-space: nowrap; }
+    .row > * { flex-shrink: 0; }
     .row.main { -webkit-app-region: drag; }
-    .tools { border-top: 1px solid #2C6372; height: 48px; padding: 0 10px; }
+    .tools { border-top: 1px solid #2C6372; min-height: 48px; padding: 6px 10px; }
     .rec { width: 11px; height: 11px; border-radius: 50%; background: #FF5A5F; animation: blink 1.2s infinite; flex-shrink: 0; }
     .paused .rec { background: #C3F44D; animation: none; }
     @keyframes blink { 50% { opacity: .25; } }
     @media (prefers-reduced-motion: reduce) { .rec { animation: none; } }
     .time { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; min-width: 58px; }
-    .grip { color: #A8C3C2; font-size: 15px; letter-spacing: -3px; flex: 1; cursor: move; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .row > .grip { color: #A8C3C2; font-size: 15px; letter-spacing: -3px; flex: 1 1 auto; width: 150px; cursor: move; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .grip.msg { font-size: 12px; letter-spacing: 0; color: #C3F44D; font-weight: 600; }
     button {
-      -webkit-app-region: no-drag; border: 0; border-radius: 999px; height: 36px; min-width: 36px; padding: 0 12px;
+      -webkit-app-region: no-drag; border: 0; border-radius: 999px; min-height: 36px; min-width: 36px; padding: 0 12px; box-sizing: border-box; white-space: nowrap;
       font: inherit; font-weight: 650; cursor: pointer; background: #21525F; color: #EAF4F1;
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     }
     button:hover { background: #2C6372; }
     button:focus-visible { outline: 2px solid #C3F44D; outline-offset: 1px; }
-    button.icon { padding: 0; width: 36px; }
+    button.icon { padding: 0; width: 36px; height: 36px; }
     button.off { background: #4A2328; color: #FFB4B6; }
     button.on { background: #C3F44D; color: #12313A; }
     #stop { background: #FF5A5F; color: #fff; }
     svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .sw { width: 22px; height: 22px; min-width: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
-    .sw.sel { border-color: #fff; }
+    .row > .sw { width: 24px; height: 24px; min-width: 24px; min-height: 24px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
+    .row > .sw.sel { border-color: #fff; box-shadow: 0 0 0 2px #12313A inset; }
     .sep { width: 1px; height: 24px; background: #2C6372; margin: 0 4px; }
     .tool.sel { background: #C3F44D; color: #12313A; }
   </style>

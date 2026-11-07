@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2 — 7 November 2026
+
+### Fixed
+- Control bar was cut off at the bottom: the drawing-tools row showed half-hidden even with the pen off
+- The bar now sizes itself to its buttons, so nothing is clipped at any Windows display scale (100–150%+) or text size
+- Shorter on-bar messages so they always fit
+
 ## 0.2.1 — 7 November 2026
 
 ### Fixed

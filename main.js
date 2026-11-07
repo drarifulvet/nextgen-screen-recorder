@@ -154,9 +154,9 @@ function displayForSelection() {
 function createBar() {
   if (barWin) return;
   const b = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  const w = 610; const h = 62;
+  const w = 640; const h = 80; // replaced by the bar's measured size before it is shown
   barWin = new BrowserWindow({
-    width: w, height: h, x: Math.round(b.x + (b.width - w) / 2), y: b.y + 14,
+    width: w, height: h, x: Math.round(b.x + (b.width - w) / 2), y: b.y + 10, show: false,
     frame: false, resizable: false, alwaysOnTop: true, skipTaskbar: true, transparent: true,
     // focusable: false = clicking the bar never takes the keyboard away from PowerPoint or other apps
     hasShadow: false, focusable: false, webPreferences: webPrefs(),
@@ -165,6 +165,21 @@ function createBar() {
   barWin.setContentProtection(true); // excluded from the recording on Windows 10 2004+ / 11
   barWin.loadURL(page('controlbar.html'));
   barWin.on('closed', () => { barWin = null; });
+  setTimeout(() => { if (barWin && !barWin.isDestroyed() && !barWin.isVisible()) barWin.showInactive(); }, 1500);
+}
+
+// Resize the bar window to exactly fit the bar (it reports its own size), keeping it centred where it is.
+function fitBar(size) {
+  if (!barWin || barWin.isDestroyed()) return;
+  const w = Math.max(200, Math.min(1600, Math.ceil(size.w)));
+  const h = Math.max(40, Math.min(400, Math.ceil(size.h)));
+  const b = barWin.getBounds();
+  const x = barWin.isVisible() ? Math.round(b.x + (b.width - w) / 2) : b.x + Math.round((b.width - w) / 2);
+  barWin.setResizable(true);
+  barWin.setBounds({ x, y: b.y, width: w, height: h });
+  barWin.setResizable(false);
+  if (!barWin.isVisible()) barWin.showInactive();
+  liftBar();
 }
 
 function createAreaFrame(area) {
@@ -218,7 +233,7 @@ function sendDraw(msg) { if (drawWin && !drawWin.isDestroyed()) drawWin.webConte
 
 function setDrawing(on) {
   if (on && selected.kind === 'window') {
-    toBar('toast', 'Drawing works for Screen and Area recordings');
+    toBar('toast', 'Pen needs Screen or Area');
     return;
   }
   recState.drawing = on;
@@ -271,7 +286,7 @@ function setMouseMode(on, quiet) {
   drawState.mouse = on;
   drawWin.setIgnoreMouseEvents(on, { forward: true });
   sendDraw({ cmd: 'mouse', on });
-  if (!quiet) toBar('toast', on ? 'Mouse mode: clicks go to your slides' : 'Pen ready');
+  if (!quiet) toBar('toast', on ? 'Mouse mode: click slides' : 'Pen ready');
   liftBar();
   pushState();
 }
@@ -804,6 +819,7 @@ ipcMain.on('bar-time', (e, t) => toBar('time', t));
 ipcMain.on('bar-command', (e, cmd) => {
   if (cmd === 'draw') return setDrawing(!recState.drawing);
   if (cmd && typeof cmd === 'object') {
+    if (cmd.size) return fitBar(cmd.size);
     if (cmd.tool) setDrawTool(cmd.tool);
     if (cmd.color) setDrawColor(cmd.color);
     return;

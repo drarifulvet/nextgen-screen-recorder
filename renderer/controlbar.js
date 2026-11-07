@@ -35,7 +35,6 @@ R.onBarState((s) => {
   if (!!s.drawing !== drawing) {
     drawing = !!s.drawing;
     $('tools').hidden = !drawing;
-    R.barCommand(drawing ? 'bar-expand' : 'bar-collapse');
   }
 });
 
@@ -48,3 +47,23 @@ R.onToast((msg) => {
   clearTimeout(msgTimer);
   msgTimer = setTimeout(() => { g.textContent = '⋮⋮'; g.classList.remove('msg'); }, 2500);
 });
+
+// Size the window to the bar itself (plus its margins), whenever the bar changes size.
+const wrap = $('wrap');
+let lastSize = '';
+function reportSize() {
+  const r = wrap.getBoundingClientRect();
+  const cs = getComputedStyle(wrap);
+  // page pixels -> window pixels (differs when Windows text size or zoom is enlarged)
+  const k = window.outerWidth && window.innerWidth ? window.outerWidth / window.innerWidth : 1;
+  const w = Math.ceil((r.width + parseFloat(cs.marginLeft) + parseFloat(cs.marginRight)) * k);
+  const h = Math.ceil((r.height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom)) * k);
+  const key = `${w}x${h}`;
+  if (key === lastSize) return;
+  lastSize = key;
+  R.barCommand({ size: { w, h } });
+}
+new ResizeObserver(reportSize).observe(wrap);
+window.addEventListener('resize', reportSize);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(reportSize);
+reportSize();

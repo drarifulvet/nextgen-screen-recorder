@@ -1,7 +1,7 @@
 {
   "name": "nextgen-screen-recorder",
   "productName": "NextGen Screen Recorder",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Free Windows screen recorder: screen, camera bubble, voice and computer sound, with presenter tools, trimming and GIF export.",
   "main": "main.js",
   "author": {
