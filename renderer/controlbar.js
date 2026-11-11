@@ -22,7 +22,8 @@ document.querySelectorAll('.sw').forEach((b) => { b.onclick = () => R.barCommand
 R.onBarTime((t) => { $('time').textContent = t; });
 R.onBarState((s) => {
   $('wrap').classList.toggle('paused', !!s.paused);
-  $('pause').textContent = s.paused ? 'Resume' : 'Pause';
+  $('pause').textContent = s.liveActive ? (s.onBreak ? 'Back live' : 'Break') : (s.paused ? 'Resume' : 'Pause');
+  $('pause').title = s.liveActive ? 'Show viewers “Be right back” and turn off your sound (Alt+Shift+P)' : 'Pause or resume (Alt+Shift+P)';
   $('mic').classList.toggle('off', !!s.muted);
   $('micSlash').style.display = s.muted ? '' : 'none';
   $('cam').classList.toggle('off', !s.camOn);
@@ -67,3 +68,13 @@ new ResizeObserver(reportSize).observe(wrap);
 window.addEventListener('resize', reportSize);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(reportSize);
 reportSize();
+
+// live status pill
+R.onBarLive((st) => {
+  const lv = $('lv');
+  if (!st || st.state === 'ended') { lv.hidden = true; return; }
+  lv.hidden = false;
+  lv.className = 'lv' + (st.state === 'live' ? '' : st.state === 'failed' ? ' off' : ' wait');
+  lv.textContent = { connecting: 'CONNECTING', reconnecting: 'RECONNECTING', live: 'LIVE', failed: 'OFFLINE' }[st.state] || '';
+  lv.title = st.message || (st.state === 'live' ? `Live on ${st.platform}` : '');
+});

@@ -1,10 +1,10 @@
 # NextGen Screen Recorder — by NextGen IT
 
-A free Windows screen recorder. It records your **screen**, a **camera bubble**, your **voice** and **computer sound** into one MP4 video, with presenter tools and simple editing built in.
+A free Windows screen recorder. It records your **screen**, a **camera bubble**, your **voice** and **computer sound** into one MP4 video, can **stream live** to YouTube, Facebook and others, and has presenter tools and simple editing built in.
 
 **Free, no time limit, no watermark. Your videos stay on your computer.**
 
-Version 0.2.2 · Windows 10 (version 2004 or newer) and Windows 11, 64-bit · 7 November 2026
+Version 0.3.0 · Windows 10 (version 2004 or newer) and Windows 11, 64-bit · 7 November 2026
 
 ---
 
@@ -17,6 +17,12 @@ Version 0.2.2 · Windows 10 (version 2004 or newer) and Windows 11, 64-bit · 7 
 - 720p or 1080p, 30 or 60 frames per second
 - Saved as **standard MP4** (H.264 video, AAC sound) that plays in every app and phone
 - **Crash recovery**: an interrupted recording can be recovered next time you open the app
+
+**Live streaming**
+- Go live to **YouTube, Facebook, Twitch** or any RTMP/RTMPS service (LinkedIn Live, X, Restream and others) with a stream key
+- 720p or 1080p; a full-quality copy is saved to the Library at the same time
+- **Break** button shows viewers "Be right back" and turns off your sound
+- Reconnects automatically if the internet drops
 
 **Presenter tools**
 - **Draw on screen** while recording: pen, highlighter, arrow, box, 4 colours, undo, clear
@@ -58,12 +64,20 @@ Arrow keys, Page Up/Down and Space keep changing your slides while the pen is on
 
 ## For users
 
-### Install
-1. Download the latest `.zip` from the [Releases page](https://github.com/drarifulvet/nextgen-screen-recorder/releases).
-2. Right-click the zip and choose **Extract All… → Extract**.
-3. Double-click **NextGen-Screen-Recorder-Setup-0.2.2.exe**.
-4. If Windows shows **"Windows protected your PC"**, click **More info**, then **Run anyway**. (The app is new and not yet code-signed.)
-5. Click **Next**, then **Install**, then open the app from the desktop shortcut.
+### Install (two choices)
+Download from the [Releases page](https://github.com/drarifulvet/nextgen-screen-recorder/releases/latest):
+
+- **Installer** (`NextGen-Screen-Recorder-Setup-…zip`): adds Start-menu and desktop shortcuts.
+  1. Right-click the zip and choose **Extract All… → Extract**.
+  2. Double-click **NextGen-Screen-Recorder-Setup-0.3.0.exe**.
+- **Portable** (`NextGen-Screen-Recorder-Portable-…zip`): no installation; runs from any folder or a USB stick.
+  1. Right-click the zip and choose **Extract All… → Extract**.
+  2. Open the **NextGen Screen Recorder** folder and double-click **NextGen Screen Recorder.exe**.
+  3. Settings and stream keys are kept in **NextGen Recorder Data** inside that folder. Stream keys are encrypted for your Windows account, so on another PC you paste them again.
+
+For either one:
+- If Windows shows **"Windows protected your PC"**, click **More info**, then **Run anyway**. (The app is new and not yet code-signed.)
+- For the installer, click **Next**, then **Install**, then open the app from the desktop shortcut.
 
 ### First start
 - Windows may ask to allow the camera and microphone: click **Allow**.
@@ -78,6 +92,19 @@ Arrow keys, Page Up/Down and Space keep changing your slides while the pen is on
 5. Use the floating bar to pause, mute, hide the camera, draw, or stop. The bar does not appear in your video.
 6. Your video is saved to **Videos\NextGen Recorder** and appears in the **Library** tab.
 
+### Go live
+1. In **Go live**, switch on **Stream while recording** and choose the platform.
+2. Click **Add stream key** and follow the three steps shown:
+   - **YouTube**: YouTube Studio → Create → Go live → Stream → copy the Stream key.
+   - **Facebook**: Facebook Live Producer → Streaming software → copy the Stream key. (Facebook requires accounts at least 60 days old; Pages and professional profiles need 100 followers.)
+   - **Twitch**: Creator Dashboard → Settings → Stream → copy the Primary Stream key.
+   - **Other**: paste the Server URL (rtmp:// or rtmps://) and Stream key from your platform.
+3. Choose **720p** (needs about 5 Mbps upload) or **1080p** (about 8 Mbps).
+4. Click **Go live** (or press Alt+Shift+R). The bar shows **LIVE** once viewers can see you.
+5. **Break** shows viewers "Be right back" and turns off your sound; **Back live** returns. **Stop** ends the broadcast and saves the copy.
+
+Keep your stream key private: anyone with it can broadcast on your channel.
+
 ### Approximate file sizes
 About **45 MB per minute at 1080p** and **27 MB per minute at 720p** (30 fps). 60 fps is about 1.5 times larger.
 
@@ -91,13 +118,14 @@ About **45 MB per minute at 1080p** and **27 MB per minute at 720p** (30 fps). 6
 3. Run `npm start`.
 
 ### Build the installer
-Run `npm run dist`. The installer appears in `dist\`.
+Run `npm run dist`. The installer and the portable zip appear in `dist\`.
 On Linux, install Wine first (the installer step uses it).
 
 ### Project layout
 | Path | What it does |
 |---|---|
-| `main.js` | Windows, shortcuts, area selection, drawing overlay, click tracking, library, FFmpeg jobs, updates, tray, crash recovery |
+| `main.js` | Windows, shortcuts, area selection, drawing overlay, click tracking, library, FFmpeg jobs, stream keys, updates, tray, crash recovery, portable mode |
+| `live.js` | Live streaming: platform presets, FFmpeg RTMP/RTMPS sender, reconnecting |
 | `preload.js` | Safe bridge between the pages and the app |
 | `renderer/index.html`, `app.js`, `styles.css` | Main screen: Record, Library and Settings |
 | `renderer/controlbar.*` | Floating control bar (hidden from recordings) |
@@ -105,12 +133,13 @@ On Linux, install Wine first (the installer step uses it).
 | `renderer/draw.*` | Draw-on-screen overlay |
 | `scripts/prepare.js` | Downloads FFmpeg and the MediaPipe blur model |
 | `scripts/afterPack.js` | Stamps the icon and version details on the .exe |
+| `scripts/portable.js` | Makes the portable zip from the Windows build |
 | `web/NextGen-Recorder.html` | Browser version for quick reviews (Chrome or Edge) |
 
 ### Releasing a new version
 1. Change `"version"` in `package.json` (for example `0.3.0`).
-2. Run `npm run dist`, then zip the installer.
-3. On GitHub, create a release with the tag `v0.3.0` and attach the zip.
+2. Run `npm run dist`, then zip the installer (the portable zip is made for you).
+3. On GitHub, create a release with the tag `v0.3.0` and attach both zips. Keep "Setup" and "Portable" in the file names: the app uses them to offer each user the right download.
 4. Users' apps will show a "new version available" notice automatically.
 
 ### Third-party components

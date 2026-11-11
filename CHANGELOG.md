@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 — 11 November 2026
+
+### Added
+- **Go live** to YouTube, Facebook, Twitch or any RTMP/RTMPS service using a stream key, one platform at a time
+  - 720p (4 Mbps) or 1080p (6 Mbps) at 30 fps, H.264 + AAC with a keyframe every 2 seconds
+  - A full-quality copy is saved to the Library while you stream
+  - **Break**: Pause while live shows viewers a "Be right back" screen and turns off your sound; the saved copy skips the break
+  - Reconnects automatically if the internet drops, and keeps recording if the stream can't continue
+  - LIVE / CONNECTING / RECONNECTING / OFFLINE status on the control bar
+  - Stream keys are stored encrypted (Windows DPAPI) and never shown in full
+- **Portable version**: a zip folder that runs without installing; settings, stream keys and the Library list stay in a "NextGen Recorder Data" folder next to the app
+- The update notice offers portable users the portable download
+
 ## 0.2.2 — 7 November 2026
 
 ### Fixed

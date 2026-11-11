@@ -21,6 +21,9 @@
     @media (prefers-reduced-motion: reduce) { .rec { animation: none; } }
     .time { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; min-width: 58px; }
     .row > .grip { color: #A8C3C2; font-size: 15px; letter-spacing: -3px; flex: 1 1 auto; width: 150px; cursor: move; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lv { font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; background: #FF5A5F; color: #fff; }
+    .lv.wait { background: #E8A33D; color: #12313A; }
+    .lv.off { background: #21525F; color: #A8C3C2; }
     .grip.msg { font-size: 12px; letter-spacing: 0; color: #C3F44D; font-weight: 600; }
     button {
       -webkit-app-region: no-drag; border: 0; border-radius: 999px; min-height: 36px; min-width: 36px; padding: 0 12px; box-sizing: border-box; white-space: nowrap;
@@ -45,6 +48,7 @@
     <div class="row main">
       <span class="rec"></span>
       <span class="time" id="time">00:00</span>
+      <span class="lv" id="lv" hidden>LIVE</span>
       <span class="grip" id="grip" title="Drag to move">⋮⋮</span>
       <button id="pause" title="Pause or resume (Alt+Shift+P)">Pause</button>
       <button class="icon" id="mic" title="Mute or unmute microphone (Alt+Shift+M)" aria-label="Microphone">

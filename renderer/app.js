@@ -35,6 +35,13 @@ let muted = false, camOn = true, counting = false;
 let lastSaved = null;
 let curSourceId = null;  // selected screen or window (not saved between sessions)
 
+// live streaming state
+let liveInfo = null;       // platforms, saved-key info (keys themselves stay in the main process)
+let liveActive = false;    // a broadcast was started with this recording
+let liveSession = 0, liveMr = null, liveQueue = Promise.resolve(), liveState = null;
+let onBreak = false;       // "Be right back" screen while live
+let sysGain = null, mixedAudioTracks = [];
+
 function makeVideo() { const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.autoplay = true; return v; }
 function setStatus(msg, isError = false) { const el = $('status'); el.textContent = msg; el.classList.toggle('error', isError); }
 function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
@@ -75,7 +82,30 @@ function bubbleRect() {
 }
 
 // ---------- drawing ----------
+function drawBreakSlate() {
+  const w = canvas.width, h = canvas.height;
+  const g = ctx.createLinearGradient(0, 0, w, h);
+  g.addColorStop(0, '#12313A'); g.addColorStop(1, '#1A434E');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  const u = h / 720;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#C3F44D';
+  ctx.font = `700 ${Math.round(72 * u)}px Segoe UI, sans-serif`;
+  ctx.fillText('Be right back', w / 2, h / 2);
+  ctx.fillStyle = '#A8C3C2';
+  ctx.font = `${Math.round(28 * u)}px Segoe UI, sans-serif`;
+  ctx.fillText('The broadcast will continue shortly', w / 2, h / 2 + 56 * u);
+  const t = performance.now() / 600;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.arc(w / 2 + (i - 1) * 28 * u, h / 2 + 110 * u, 7 * u, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(195, 244, 77, ${0.3 + 0.7 * Math.max(0, Math.sin(t - i * 0.6))})`;
+    ctx.fill();
+  }
+}
+
 function draw() {
+  if (onBreak) { if (micAnalyser) updateMicMeter(); return drawBreakSlate(); }
   const src = screenStream && screenVid.readyState >= 2 ? sourceRect() : null;
   if (src && src.w > 0 && src.h > 0) {
     fitCanvas(src);
@@ -464,13 +494,15 @@ function buildMixedAudio() {
     return g;
   };
   micGain = add(micStream, muted ? 0 : 1.0);
-  add(screenStream, 0.9);
-  return count ? dest.stream.getAudioTracks() : [];
+  sysGain = add(screenStream, 0.9);
+  mixedAudioTracks = count ? dest.stream.getAudioTracks() : [];
+  return mixedAudioTracks;
 }
 
 async function startRecording() {
   if (recording() || counting || !screenStream) return;
   if (S.mode === 'area' && !S.area) { setStatus('Select an area first.', true); return; }
+  if (S.liveOn && !liveReady()) { openLiveDialog(); setStatus('Add your stream key to go live.', true); return; }
   $('saved').hidden = true;
   counting = true;
   setControls('countdown');
@@ -513,12 +545,14 @@ async function startRecording() {
   document.body.classList.add('recording');
   setControls('recording');
   setStatus('Recording…');
+  if (S.liveOn) startLive();
   uiTimer = setInterval(tickUi, 500);
   tickUi();
 }
 
 function togglePause() {
   if (!mr) return;
+  if (liveActive) return toggleBreak();
   if (mr.state === 'recording') { mr.pause(); pausedAt = performance.now(); setStatus('Paused.'); }
   else if (mr.state === 'paused') { mr.resume(); pausedTotal += performance.now() - pausedAt; pausedAt = 0; setStatus('Recording…'); }
   pushState();
@@ -526,7 +560,7 @@ function togglePause() {
 }
 function toggleMute() {
   muted = !muted;
-  if (micGain) micGain.gain.value = muted ? 0 : 1;
+  if (micGain) micGain.gain.value = muted || onBreak ? 0 : 1;
   $('muteBtn').textContent = muted ? 'Unmute mic' : 'Mute mic';
   if (recording()) setStatus(muted ? 'Microphone muted.' : 'Microphone on.');
   pushState();
@@ -536,15 +570,192 @@ function toggleCamera() {
   pushState();
 }
 function pushState() {
-  R.sendState({ paused: !!(mr && mr.state === 'paused'), muted, camOn });
-  $('pauseBtn').textContent = mr && mr.state === 'paused' ? 'Resume' : 'Pause';
+  R.sendState({ paused: !!(mr && mr.state === 'paused'), muted, camOn, liveActive, onBreak });
+  $('pauseBtn').textContent = liveActive ? (onBreak ? 'Back live' : 'Break') : (mr && mr.state === 'paused' ? 'Resume' : 'Pause');
 }
 function stopRecording() {
-  if (mr && mr.state !== 'inactive') { setStatus('Finishing the video…'); mr.stop(); }
+  if (liveActive) stopLive();
+  if (mr && mr.state !== 'inactive') {
+    if (mr.state === 'paused') { mr.resume(); pausedTotal += performance.now() - pausedAt; pausedAt = 0; }
+    setStatus('Finishing the video…');
+    mr.stop();
+  }
+}
+
+// ---------- live streaming ----------
+function liveReady() {
+  if (!liveInfo) return false;
+  const k = liveInfo.keyInfo[S.livePlatform] || {};
+  if (S.livePlatform === 'custom') return !!liveInfo.customServer;
+  return !!k.saved;
+}
+function pickLiveFormat() {
+  const options = ['video/x-matroska;codecs=avc1,opus', 'video/webm;codecs=h264,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  return options.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+}
+async function startLive() {
+  liveActive = true;
+  onBreak = false;
+  const res = await R.liveStart({ platform: S.livePlatform, quality: S.liveQuality, hasAudio: mixedAudioTracks.length > 0 });
+  if (!res.ok) {
+    liveActive = false;
+    setStatus(`Not live: ${res.error} Recording continues.`, true);
+    pushState();
+    return;
+  }
+  liveSession = res.session;
+  startLiveRecorder(liveSession);
+  pushState();
+}
+function startLiveRecorder(session) {
+  stopLiveRecorder();
+  const mime = pickLiveFormat();
+  const tracks = [canvas.captureStream(30).getVideoTracks()[0], ...mixedAudioTracks];
+  const highBits = S.liveQuality === '1080' ? 12_000_000 : 8_000_000; // high, so the stream copy stays sharp
+  try {
+    liveMr = new MediaRecorder(new MediaStream(tracks), { mimeType: mime || undefined, videoBitsPerSecond: highBits, audioBitsPerSecond: 192_000 });
+  } catch {
+    setStatus('This PC could not start the stream encoder. Recording continues.', true);
+    R.liveStop();
+    liveActive = false;
+    return;
+  }
+  const rec = liveMr;
+  liveQueue = Promise.resolve();
+  rec.ondataavailable = (e) => {
+    if (!e.data || !e.data.size || rec !== liveMr) return;
+    liveQueue = liveQueue.then(() => e.data.arrayBuffer()).then((buf) => { if (rec === liveMr) R.liveChunk(session, buf); }).catch(() => {});
+  };
+  rec.start(250);
+}
+function stopLiveRecorder() {
+  const rec = liveMr;
+  liveMr = null;
+  if (rec && rec.state !== 'inactive') { try { rec.stop(); } catch { /* ignore */ } }
+  if (rec && rec.stream) rec.stream.getVideoTracks().forEach((t) => t.stop());
+}
+async function stopLive() {
+  stopLiveRecorder();
+  liveActive = false;
+  if (onBreak) setBreak(false);
+  await R.liveStop();
+  showLivePill(null);
+  pushState();
+}
+function setBreak(on) {
+  onBreak = on;
+  if (micGain) micGain.gain.value = on || muted ? 0 : 1;
+  if (sysGain) sysGain.gain.value = on ? 0 : 0.9;
+  // the saved copy skips the break; the broadcast shows "Be right back"
+  if (mr) {
+    if (on && mr.state === 'recording') { mr.pause(); pausedAt = performance.now(); }
+    else if (!on && mr.state === 'paused') { mr.resume(); pausedTotal += performance.now() - pausedAt; pausedAt = 0; }
+  }
+}
+function toggleBreak() {
+  setBreak(!onBreak);
+  setStatus(onBreak ? 'On a break: viewers see “Be right back”. Your mic and computer sound are off.' : 'Back live.');
+  pushState();
+  tickUi();
+}
+function showLivePill(st) {
+  const pill = $('livePill');
+  if (!st || st.state === 'ended') { pill.hidden = true; return; }
+  pill.hidden = false;
+  pill.className = 'live-pill' + (st.state === 'live' ? '' : st.state === 'failed' ? ' off' : ' wait');
+  pill.textContent = { connecting: 'CONNECTING', reconnecting: 'RECONNECTING', live: 'LIVE', failed: 'OFFLINE' }[st.state] || '';
+}
+R.onLiveState((st) => {
+  liveState = st;
+  showLivePill(st);
+  const el = $('status');
+  if (st.state === 'connecting') setStatus(`Connecting to ${st.platform}…`);
+  else if (st.state === 'live' && !st.health) setStatus(`Live on ${st.platform}. Recording a copy.`);
+  else if (st.state === 'live' && st.health && !onBreak) { el.textContent = `Live on ${st.platform} · ${(st.kbps / 1000).toFixed(1)} Mbps`; el.classList.remove('error'); }
+  else if (st.state === 'reconnecting') {
+    setStatus(st.retryInMs
+      ? `${st.message} Reconnecting in ${Math.round(st.retryInMs / 1000)} s… Recording continues.`
+      : `Reconnecting to ${st.platform} (try ${st.attempt})… Recording continues.`, true);
+  }
+  else if (st.state === 'failed') {
+    setStatus(`Live stopped: ${st.message} Recording continues.`, true);
+    stopLiveRecorder();
+    liveActive = false;
+    if (onBreak) setBreak(false);
+    pushState();
+  }
+  if (st.warn) setStatus(st.warn, true);
+  el.classList.toggle('live', st.state === 'live');
+});
+R.onLiveRestart((session) => {
+  if (!liveActive) return;
+  liveSession = session;
+  startLiveRecorder(session);
+});
+
+// key dialog
+function refreshLiveUi() {
+  if (!liveInfo) return;
+  $('liveChk').checked = !!S.liveOn;
+  $('liveBody').hidden = !S.liveOn;
+  $('livePlatform').value = S.livePlatform;
+  markActive('liveQualitySeg', 'lq', S.liveQuality);
+  const k = liveInfo.keyInfo[S.livePlatform] || {};
+  const name = liveInfo.platforms[S.livePlatform].name;
+  if (S.livePlatform === 'custom') {
+    $('liveKeyLabel').textContent = liveInfo.customServer ? `Server: ${liveInfo.customServer.replace(/^rtmps?:\/\//, '').split('/')[0]}` : 'No server yet';
+    $('liveKeyBtn').textContent = liveInfo.customServer ? 'Change' : 'Set up';
+  } else if (k.saved) {
+    $('liveKeyLabel').textContent = `${name} key saved (…${k.tail})`;
+    $('liveKeyBtn').textContent = 'Change key';
+  } else {
+    $('liveKeyLabel').textContent = k.unreadable ? 'Saved key can\'t be read on this PC' : 'No stream key yet';
+    $('liveKeyBtn').textContent = 'Add stream key';
+  }
+  setControls(recording() ? 'recording' : 'idle');
+}
+function openLiveDialog() {
+  const id = S.livePlatform;
+  const p = liveInfo.platforms[id];
+  const k = liveInfo.keyInfo[id] || {};
+  $('lvTitle').textContent = id === 'custom' ? 'Stream to another platform' : `Stream to ${p.name}`;
+  $('lvSteps').innerHTML = '';
+  p.keyHelp.forEach((t) => { const li = document.createElement('li'); li.textContent = t; $('lvSteps').appendChild(li); });
+  $('lvOpen').hidden = !p.keyUrl;
+  $('lvOpen').textContent = { youtube: 'Open YouTube Studio', facebook: 'Open Facebook Live Producer', twitch: 'Open Twitch dashboard' }[id] || 'Open';
+  $('lvNote').hidden = !p.note;
+  $('lvNote').textContent = p.note || '';
+  $('lvServerRow').hidden = id !== 'custom';
+  $('lvServer').value = id === 'custom' ? liveInfo.customServer : '';
+  $('lvKey').value = '';
+  $('lvKey').type = 'password';
+  $('lvShow').textContent = 'Show';
+  $('lvKey').placeholder = id === 'custom' ? 'Stream key (leave empty if it is part of the server URL)' : 'Paste your stream key';
+  $('lvSaved').textContent = k.saved ? `A key is saved (ends in …${k.tail}). Paste a new one to replace it.` : '';
+  $('lvRemove').hidden = !k.saved;
+  $('lvErr').hidden = true;
+  $('liveDlg').hidden = false;
+  $(id === 'custom' ? 'lvServer' : 'lvKey').focus();
+}
+async function saveLiveDialog() {
+  const id = S.livePlatform;
+  const payload = { platform: id, key: $('lvKey').value };
+  if (id === 'custom') payload.server = $('lvServer').value;
+  else if (!$('lvKey').value.trim() && !(liveInfo.keyInfo[id] || {}).saved) { $('lvErr').textContent = 'Paste your stream key first.'; $('lvErr').hidden = false; return; }
+  const r = await R.liveSave(payload);
+  if (!r.ok) { $('lvErr').textContent = r.error; $('lvErr').hidden = false; return; }
+  liveInfo = r.info;
+  $('lvKey').value = '';
+  $('liveDlg').hidden = true;
+  refreshLiveUi();
+  setStatus(`${liveInfo.platforms[id].name} is ready. Press Go live to start.`);
 }
 
 async function finishRecording() {
   clearInterval(uiTimer);
+  if (liveActive) await stopLive();
+  onBreak = false;
+  sysGain = null; mixedAudioTracks = [];
   const durationMs = elapsedMs();
   mixNodes.forEach((n) => { try { n.disconnect(); } catch { /* ignore */ } });
   mixNodes = []; micGain = null;
@@ -589,7 +800,7 @@ function setControls(mode) {
   const rec = $('recordBtn');
   rec.hidden = mode === 'recording';
   rec.disabled = mode !== 'idle' || !canRecord();
-  $('recordLabel').textContent = mode === 'countdown' ? 'Get ready…' : 'Start recording';
+  $('recordLabel').textContent = mode === 'countdown' ? 'Get ready…' : (S.liveOn ? 'Go live' : 'Start recording');
   $('pauseBtn').hidden = $('muteBtn').hidden = $('stopBtn').hidden = mode !== 'recording';
   $('timer').classList.toggle('live', mode === 'recording');
 }
@@ -724,6 +935,12 @@ R.onJobProgress((p) => {
 // ---------- settings view ----------
 function renderSettings() {
   $('saveDirLabel').textContent = S.saveDir;
+  if (info.portable) {
+    $('portableNote').hidden = false;
+    $('portableNote').textContent = info.portable.dataDir
+      ? `Portable version: settings, stream keys and the Library list are kept in ${info.portable.dataDir}.`
+      : 'Portable version: the app folder is read-only, so settings are kept in your Windows profile instead.';
+  }
   $('askSaveChk').checked = !!S.askWhereToSave;
   $('standardChk').checked = S.standardMp4 !== false;
   markActive('themeSeg', 'theme', S.theme);
@@ -864,6 +1081,22 @@ function bindUi() {
   document.querySelectorAll('#fpsSeg button').forEach((b) => { b.onclick = () => { if (recording()) return; save({ fps: Number(b.dataset.fps) }); markActive('fpsSeg', 'fps', b.dataset.fps); startTicker(); startScreen(); }; });
   $('countdownChk').onchange = (e) => save({ countdown: e.target.checked });
 
+  $('liveChk').onchange = async (e) => {
+    await save({ liveOn: e.target.checked });
+    refreshLiveUi();
+    if (S.liveOn && !liveReady()) openLiveDialog();
+  };
+  $('livePlatform').onchange = async (e) => { await save({ livePlatform: e.target.value }); refreshLiveUi(); if (!liveReady()) openLiveDialog(); };
+  document.querySelectorAll('#liveQualitySeg button').forEach((b) => { b.onclick = async () => { if (recording()) return; await save({ liveQuality: b.dataset.lq }); refreshLiveUi(); }; });
+  $('liveKeyBtn').onclick = openLiveDialog;
+  $('lvSave').onclick = saveLiveDialog;
+  $('lvCancel').onclick = () => { $('lvKey').value = ''; $('liveDlg').hidden = true; };
+  $('lvClose').onclick = () => { $('lvKey').value = ''; $('liveDlg').hidden = true; };
+  $('lvShow').onclick = () => { const k = $('lvKey'); k.type = k.type === 'password' ? 'text' : 'password'; $('lvShow').textContent = k.type === 'password' ? 'Show' : 'Hide'; };
+  $('lvOpen').onclick = () => { const p = liveInfo.platforms[S.livePlatform]; if (p.keyUrl) R.openExternal(p.keyUrl); };
+  $('lvRemove').onclick = async () => { const r = await R.liveSave({ platform: S.livePlatform, remove: true }); if (r.ok) { liveInfo = r.info; refreshLiveUi(); openLiveDialog(); } };
+  $('lvKey').onkeydown = (e) => { if (e.key === 'Enter') saveLiveDialog(); };
+
   $('recordBtn').onclick = startRecording;
   $('pauseBtn').onclick = togglePause;
   $('muteBtn').onclick = toggleMute;
@@ -928,7 +1161,7 @@ function bindUi() {
     if (e.key !== 'Escape') return;
     if (!$('tour').hidden) endTour();
     else if (!$('editor').hidden) $('edClose').click();
-    else { $('renameDlg').hidden = true; $('confirmDlg').hidden = true; }
+    else { $('renameDlg').hidden = true; $('confirmDlg').hidden = true; $('lvKey').value = ''; $('liveDlg').hidden = true; }
   });
 
   navigator.mediaDevices.addEventListener('devicechange', async () => {
@@ -957,6 +1190,8 @@ function applySettingsToUi() {
   info = await R.init();
   S = info.settings;
   library = info.library || [];
+  liveInfo = info.live;
+  refreshLiveUi();
   applyTheme(S.theme === 'dark' || (S.theme === 'system' && info.dark));
   applySettingsToUi();
   bindUi();

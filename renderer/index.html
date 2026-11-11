@@ -109,6 +109,28 @@
         <p class="hint" id="sysHint">Records videos, music and app sounds. Use headphones to avoid echo.</p>
       </div>
 
+      <div class="card" id="cardLive">
+        <div class="card-head">
+          <h2>Go live</h2>
+          <span class="live-pill" id="livePill" hidden>LIVE</span>
+        </div>
+        <label class="switch"><input type="checkbox" id="liveChk"><span class="track"><span class="knob"></span></span><span>Stream while recording</span></label>
+        <div class="live-body" id="liveBody" hidden>
+          <select id="livePlatform" aria-label="Platform">
+            <option value="youtube">YouTube</option>
+            <option value="facebook">Facebook</option>
+            <option value="twitch">Twitch</option>
+            <option value="custom">Other (RTMP)</option>
+          </select>
+          <div class="row">
+            <span class="label" id="liveKeyLabel">No stream key yet</span>
+            <button class="btn-outline" id="liveKeyBtn">Add stream key</button>
+          </div>
+          <div class="seg wide" id="liveQualitySeg"><button data-lq="720">720p · 4 Mbps</button><button data-lq="1080">1080p · 6 Mbps</button></div>
+          <p class="hint" id="liveHint">Needs about 5 Mbps upload. A copy is saved to your Library. Pause shows viewers a “Be right back” screen.</p>
+        </div>
+      </div>
+
       <div class="card" id="cardPresenter">
         <h2>Presenter tools</h2>
         <label class="switch"><input type="checkbox" id="haloChk"><span class="track"><span class="knob"></span></span><span>Highlight my mouse pointer</span></label>
@@ -152,6 +174,7 @@
         <div><strong>Save recordings to</strong><span class="hint" id="saveDirLabel"></span></div>
         <button class="btn-ghost" id="saveDirBtn">Change…</button>
       </div>
+      <p class="hint" id="portableNote" hidden></p>
       <label class="switch"><input type="checkbox" id="askSaveChk"><span class="track"><span class="knob"></span></span><span>Ask where to save each recording</span></label>
       <label class="switch"><input type="checkbox" id="standardChk"><span class="track"><span class="knob"></span></span><span>Save as standard MP4 (plays in every app and phone)</span></label>
     </section>
@@ -212,6 +235,30 @@
       </div>
       <p class="hint" id="edNote">Your original is never changed: each action saves a new file next to it.</p>
       <div class="progress" id="edProgress" hidden><div id="edBar"></div><span id="edPct">0%</span><button class="link" id="edCancel">Cancel</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="liveDlg" hidden role="dialog" aria-modal="true" aria-labelledby="lvTitle">
+    <div class="modal-card">
+      <div class="modal-head"><h2 id="lvTitle">Stream to YouTube</h2><button class="icon-btn" id="lvClose" aria-label="Close">✕</button></div>
+      <ol class="steps" id="lvSteps"></ol>
+      <button class="btn-ghost" id="lvOpen">Open YouTube Studio</button>
+      <p class="hint" id="lvNote" hidden></p>
+      <label class="field" id="lvServerRow" hidden>
+        <span>Server URL</span>
+        <input type="text" id="lvServer" placeholder="rtmps://…" spellcheck="false" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>Stream key</span>
+        <span class="key-row">
+          <input type="password" id="lvKey" spellcheck="false" autocomplete="off" placeholder="Paste your stream key">
+          <button class="btn-ghost" id="lvShow" type="button">Show</button>
+        </span>
+      </label>
+      <p class="hint" id="lvSaved"></p>
+      <p class="hint error" id="lvErr" hidden></p>
+      <p class="hint">Keep your stream key private: anyone with it can broadcast on your channel. It is stored encrypted on this computer.</p>
+      <div class="ed-actions"><button class="link" id="lvRemove">Remove saved key</button><span class="spacer"></span><button class="btn-ghost" id="lvCancel">Cancel</button><button class="btn-solid" id="lvSave">Save</button></div>
     </div>
   </div>
 

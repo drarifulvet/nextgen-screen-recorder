@@ -1,8 +1,8 @@
 {
   "name": "nextgen-screen-recorder",
   "productName": "NextGen Screen Recorder",
-  "version": "0.2.2",
-  "description": "Free Windows screen recorder: screen, camera bubble, voice and computer sound, with presenter tools, trimming and GIF export.",
+  "version": "0.3.0",
+  "description": "Free Windows screen recorder: screen, camera bubble, voice and computer sound, with live streaming, presenter tools, trimming and GIF export.",
   "main": "main.js",
   "author": {
     "name": "NextGen IT",
@@ -14,7 +14,7 @@
     "start": "electron .",
     "prepare": "node scripts/prepare.js",
     "predist": "node scripts/prepare.js",
-    "dist": "electron-builder --win nsis --x64 --publish never"
+    "dist": "electron-builder --win nsis --x64 --publish never && node scripts/portable.js"
   },
   "devDependencies": {
     "electron": "^45.2.3",
@@ -26,13 +26,14 @@
   "build": {
     "appId": "com.nextgenit.screenrecorder",
     "productName": "NextGen Screen Recorder",
-    "copyright": "\u00a9 2026 NextGen IT",
+    "copyright": "© 2026 NextGen IT",
     "directories": {
       "output": "dist",
       "buildResources": "build"
     },
     "files": [
       "main.js",
+      "live.js",
       "preload.js",
       "renderer/**",
       "assets/**",

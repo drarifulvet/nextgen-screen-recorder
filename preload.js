@@ -32,6 +32,15 @@ contextBridge.exposeInMainWorld('recorder', {
   libDelete: call('lib-delete'),
   libProcess: call('lib-process'),
   libCancel: call('lib-cancel'),
+  // live streaming
+  liveInfo: call('live-info'),
+  liveSave: call('live-save'),
+  liveStart: call('live-start'),
+  liveStop: call('live-stop'),
+  liveChunk: (session, buf) => ipcRenderer.send('live-chunk', { session, buf }),
+  onLiveState: on('live-state'),
+  onLiveRestart: on('live-restart'),
+  onBarLive: on('live'),
   // updates + links
   checkUpdates: call('check-updates'),
   releasesPage: call('releases-page'),

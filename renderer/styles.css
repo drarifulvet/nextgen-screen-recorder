@@ -213,3 +213,15 @@ body.recording .panel { pointer-events: none; opacity: .5; }
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
 @media (max-width: 1000px) { .layout { grid-template-columns: 1fr 300px; } .kbd-hint { display: none; } }
+
+/* live */
+.live-body { display: flex; flex-direction: column; gap: 9px; }
+.live-pill { font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 2px 9px; border-radius: 999px; background: var(--red); color: #fff; }
+.live-pill.wait { background: #E8A33D; color: #12313A; }
+.live-pill.off { background: var(--panel-2); color: var(--muted); }
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; color: var(--text); }
+.field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--muted); }
+.key-row { display: flex; gap: 8px; }
+.key-row input { flex: 1; min-width: 0; font-family: Consolas, "Cascadia Mono", monospace; }
+input[type="password"] { padding: 8px 10px; border-radius: 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); font: inherit; user-select: text; }
+.status.live { color: var(--red); font-weight: 600; }

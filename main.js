@@ -1,11 +1,12 @@
-// NextGen Screen Recorder v0.2 — main process
+// NextGen Screen Recorder — main process
 // Screen + camera bubble + microphone + computer sound in one video, with presenter tools,
-// a recordings library, trimming/GIF/compress (FFmpeg), update notices and crash recovery.
+// live streaming (RTMP/RTMPS), a recordings library, trimming/GIF/compress (FFmpeg),
+// update notices, crash recovery and a portable mode.
 'use strict';
 
 const {
   app, BrowserWindow, ipcMain, desktopCapturer, session, dialog, shell, screen,
-  protocol, globalShortcut, Tray, Menu, nativeImage, nativeTheme, net,
+  protocol, globalShortcut, Tray, Menu, nativeImage, nativeTheme, net, safeStorage,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -16,6 +17,26 @@ const APP_ID = 'com.nextgenit.screenrecorder';
 const GITHUB_REPO = 'drarifulvet/nextgen-screen-recorder';
 const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases`;
 const APP_VERSION = require('./package.json').version;
+const { PLATFORMS, QUALITY, LiveSession } = require('./live');
+
+// ---------- portable mode ----------
+// The portable zip contains a 'portable.ini' file next to the app. When it is there, settings,
+// stream keys and the Library list are kept in a 'NextGen Recorder Data' folder beside the app.
+const IS_PORTABLE = (() => {
+  if (!app.isPackaged) return !!process.env.NGR_PORTABLE_DIR;
+  return fs.existsSync(path.join(path.dirname(process.execPath), 'portable.ini'));
+})();
+let portableDataOk = false;
+if (IS_PORTABLE) {
+  const base = process.env.NGR_PORTABLE_DIR || path.dirname(process.execPath);
+  const dataDir = path.join(base, 'NextGen Recorder Data');
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.accessSync(dataDir, fs.constants.W_OK);
+    app.setPath('userData', dataDir);
+    portableDataOk = true;
+  } catch { /* read-only location: fall back to the Windows profile */ }
+}
 
 app.setAppUserModelId(APP_ID);
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -63,6 +84,9 @@ const DEFAULTS = {
   theme: 'system',
   checkUpdates: true,
   tourDone: false,
+  liveOn: false,
+  livePlatform: 'youtube',
+  liveQuality: '720',
 };
 let settings = { ...DEFAULTS };
 
@@ -373,7 +397,7 @@ function refreshTray() {
     { label: 'Quit', click: () => app.quit() },
   ]);
   tray.setContextMenu(menu);
-  tray.setToolTip(recState.recording ? 'NextGen Screen Recorder — recording' : 'NextGen Screen Recorder');
+  tray.setToolTip(recState.live === 'live' ? 'NextGen Screen Recorder — LIVE' : recState.recording ? 'NextGen Screen Recorder — recording' : 'NextGen Screen Recorder');
 }
 function showMain() {
   if (!mainWin) return createMainWindow();
@@ -484,6 +508,8 @@ ipcMain.handle('init', () => ({
   shortcuts: SHORTCUTS.map(([acc, cmd, label]) => ({ acc, cmd, label, ok: shortcutStatus[acc] !== false })),
   drawShortcuts: DRAW_SHORTCUTS.map(([acc, , label]) => ({ acc, label })),
   hasClickHook: (() => { try { require.resolve('uiohook-napi'); return true; } catch { return false; } })(),
+  portable: IS_PORTABLE ? { dataDir: portableDataOk ? USER() : null } : null,
+  live: liveInfo(),
   dark: nativeTheme.shouldUseDarkColors,
   library: library.map(publicEntry),
   recovery: listRecovery(),
@@ -503,7 +529,8 @@ ipcMain.handle('choose-save-dir', async () => {
 });
 ipcMain.handle('open-save-dir', () => { fs.mkdirSync(settings.saveDir, { recursive: true }); return shell.openPath(settings.saveDir); });
 ipcMain.handle('open-external', (e, url) => {
-  if (/^https:\/\/(github\.com|api\.github\.com)\//.test(url)) shell.openExternal(url);
+  const allowed = [/^https:\/\/(github\.com|api\.github\.com)\//, ...Object.values(PLATFORMS).filter((p) => p.keyUrl).map((p) => new RegExp('^' + p.keyUrl.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')))];
+  if (allowed.some((r) => r.test(url))) shell.openExternal(url);
   return true;
 });
 
@@ -834,6 +861,83 @@ ipcMain.on('bar-command', (e, cmd) => {
 });
 ipcMain.on('draw-exit', () => setDrawing(false));
 
+// ---------- live streaming ----------
+// Stream keys are encrypted with Windows' own protection (DPAPI) for this Windows account.
+function encKey(plain) {
+  if (!plain) return '';
+  if (safeStorage.isEncryptionAvailable()) return 'enc:' + safeStorage.encryptString(plain).toString('base64');
+  return 'b64:' + Buffer.from(plain, 'utf8').toString('base64');
+}
+function decKey(stored) {
+  if (!stored) return '';
+  try {
+    if (stored.startsWith('enc:')) return safeStorage.decryptString(Buffer.from(stored.slice(4), 'base64'));
+    if (stored.startsWith('b64:')) return Buffer.from(stored.slice(4), 'base64').toString('utf8');
+  } catch { return ''; }
+  return '';
+}
+function liveInfo() {
+  const keys = settings.liveKeys || {};
+  const keyInfo = {};
+  for (const id of Object.keys(PLATFORMS)) {
+    const k = decKey(keys[id]);
+    keyInfo[id] = keys[id] ? (k ? { saved: true, tail: k.slice(-4) } : { saved: false, unreadable: true }) : { saved: false };
+  }
+  return {
+    platforms: Object.fromEntries(Object.entries(PLATFORMS).map(([id, p]) => [id, { name: p.name, server: p.server, keyUrl: p.keyUrl, keyHelp: p.keyHelp, note: p.note || null }])),
+    quality: Object.fromEntries(Object.entries(QUALITY).map(([id, q]) => [id, q.label])),
+    keyInfo,
+    customServer: settings.liveCustomServer || '',
+  };
+}
+ipcMain.handle('live-info', () => liveInfo());
+ipcMain.handle('live-save', (e, { platform, key, server, remove }) => {
+  if (!PLATFORMS[platform]) return { ok: false, error: 'Unknown platform.' };
+  const keys = { ...(settings.liveKeys || {}) };
+  if (platform === 'custom' && server !== undefined) {
+    const sv = String(server || '').trim();
+    if (sv && !/^rtmps?:\/\/[^\s]+$/i.test(sv)) return { ok: false, error: 'The server address must start with rtmp:// or rtmps://' };
+    settings.liveCustomServer = sv;
+  }
+  if (remove) delete keys[platform];
+  else if (key !== undefined && key !== null && String(key).trim()) {
+    const k = String(key).trim();
+    if (/\s/.test(k)) return { ok: false, error: 'A stream key has no spaces. Copy it again.' };
+    keys[platform] = encKey(k);
+  }
+  settings.liveKeys = keys;
+  saveSettings();
+  return { ok: true, info: liveInfo() };
+});
+
+let live = null;
+ipcMain.handle('live-start', (e, { platform, quality, hasAudio }) => {
+  if (live) { live.stop(); live = null; }
+  const p = PLATFORMS[platform];
+  if (!p) return { ok: false, error: 'Unknown platform.' };
+  const key = decKey((settings.liveKeys || {})[platform]);
+  const server = platform === 'custom' ? (settings.liveCustomServer || '') : p.server;
+  if (!server) return { ok: false, error: 'Add the server address for your platform first.' };
+  if (!key && platform !== 'custom') return { ok: false, error: `Add your ${p.name} stream key first.` };
+  live = new LiveSession({
+    ffmpeg: ffmpegPath(), platform, server, key, quality: String(quality || '720'), hasAudio: !!hasAudio,
+    onState: (st) => {
+      recState.live = st.state;
+      toMain('live-state', st);
+      toBar('live', st);
+      if (st.message && (st.state === 'failed' || st.state === 'reconnecting')) toBar('toast', st.state === 'failed' ? 'Live stopped' : 'Reconnecting…');
+      if (st.warn) toBar('toast', 'Internet too slow');
+      refreshTray();
+    },
+    onRestart: (session) => toMain('live-restart', session),
+  });
+  const session = live.start();
+  return { ok: true, session, platform: live.name };
+});
+ipcMain.on('live-chunk', (e, { session, buf }) => { if (live) live.write(session, buf); });
+ipcMain.handle('live-stop', () => { if (live) { live.stop(); live = null; } recState.live = null; return true; });
+app.on('before-quit', () => { if (live) live.stop(); });
+
 // ---------- updates (GitHub releases) ----------
 function newer(a, b) {
   const pa = String(a).replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
@@ -849,7 +953,9 @@ ipcMain.handle('check-updates', async () => {
     if (res.status === 404) return { ok: true, latest: null, current: APP_VERSION, update: false };
     if (!res.ok) return { ok: false, error: `GitHub answered ${res.status}.` };
     const j = await res.json();
-    const asset = (j.assets || []).find((a) => /\.(zip|exe)$/i.test(a.name));
+    const assets = j.assets || [];
+    const asset = assets.find((a) => (IS_PORTABLE ? /portable.*\.zip$/i : /setup.*\.(zip|exe)$/i).test(a.name))
+      || assets.find((a) => /\.(zip|exe)$/i.test(a.name));
     return {
       ok: true, current: APP_VERSION, latest: j.tag_name, update: newer(j.tag_name, APP_VERSION),
       url: asset ? asset.browser_download_url : (j.html_url || RELEASES_URL), notes: (j.body || '').slice(0, 600),
